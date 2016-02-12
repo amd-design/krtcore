@@ -2,8 +2,6 @@
 #include "RTMain.h"
 #include "ProgramArguments.h"
 
-#include "streaming.h"
-
 #include <stdio.h>
 
 namespace krt
@@ -17,9 +15,6 @@ int unknown()
 
 int Main::Run(const ProgramArguments& arguments)
 {
-    // Meow.
-    Streaming::StreamMan meowStreamer;
-
 	unknown();
 	unknown();
 	unknown();

@@ -26,15 +26,29 @@ workspace 'krt'
         targetname 'KRT.%{cfg.buildcfg}'
         language 'C++'
         kind 'ConsoleApp'
+        
+        filter 'configurations:Debug'
+            links { "vendors/eir/slibs/native_exec_d_v140_x64" }
+        filter 'configurations:Release'
+            links { "vendors/eir/slibs/native_exec_v140_x64" }
+        filter {}
 
-        includedirs { 'core/include' }
+        includedirs
+        {
+            'core/include',
+            'streaming/include',
+            'vendors/eir/eirrepo',
+            'vendors/eir/NativeExecutive'
+        }
 
         files
         {
             'common/**.h',
             'common/**.cpp',
             'core/**.h',
-            'core/**.cpp'
+            'core/**.cpp',
+            'streaming/**.h',
+            'streaming/**.cpp'
         }
 
         filter 'system:windows'

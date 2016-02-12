@@ -1,0 +1,6 @@
+[submodule "krt/vendors/eir/eirrepo"]
+	path = krt/vendors/eir/eirrepo
+	url = https://github.com/quiret/eirshared
+[submodule "krt/vendors/eir/NativeExecutive"]
+	path = krt/vendors/eir/NativeExecutive
+	url = https://github.com/quiret/NativeExecutive.git
