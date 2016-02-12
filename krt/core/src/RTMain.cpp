@@ -6,10 +6,15 @@
 
 #include <stdio.h>
 
+#include <vfs/Manager.h>
+
 namespace krt
 {
 int unknown()
 {
+	vfs::StreamPtr stream = vfs::OpenRead("C:\\Windows\\system32\\License.rtf");
+	auto data = stream->ReadToEnd();
+
 	assert(false && "hey!");
 
 	return 0;
