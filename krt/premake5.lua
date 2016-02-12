@@ -27,14 +27,16 @@ workspace 'krt'
         language 'C++'
         kind 'ConsoleApp'
 
-        includedirs { 'core/include' }
+        includedirs { 'core/include', 'streaming/include' }
 
         files
         {
             'common/**.h',
             'common/**.cpp',
             'core/**.h',
-            'core/**.cpp'
+            'core/**.cpp',
+            'streaming/**.h',
+            'streaming/**.cpp',
         }
 
         filter 'system:windows'
