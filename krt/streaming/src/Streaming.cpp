@@ -106,55 +106,39 @@ void StreamMan::StreamingChannelRuntime( void *ud )
 
             if ( wantedResource )
             {
-                if ( wantedResource->status == eResourceStatus::UNLOADED )
+                if ( request.reqType == Channel::eRequestType::LOAD )
                 {
-                    // We will start by buffering things.
-                    wantedResource->status = eResourceStatus::BUFFERING;
+                    // Who cares if we are terminating?
+                    if ( manager->isTerminating == false && wantedResource->isAllowedToLoad == true )
+                    {
+                        if ( wantedResource->status == eResourceStatus::UNLOADED )
+                        {
+                            // We will start by buffering things.
+                            wantedResource->status = eResourceStatus::BUFFERING;
 
-                    // We can load currently not loaded things, so proceed.
-                    resToLoad = wantedResource;
+                            // We can load currently not loaded things, so proceed.
+                            resToLoad = wantedResource;
+                        }
+                    }
+                }
+                else if ( request.reqType == Channel::eRequestType::UNLOAD )
+                {
+                    if ( wantedResource->status == eResourceStatus::LOADED )
+                    {
+                        // Well, we want to do some stuff with this resource it seems...
+                        resToLoad = wantedResource;
+                    }
+                }
+                else
+                {
+                    assert( 0 );
                 }
             }
         }
 
         if ( resToLoad )
         {
-            shared_lock_acquire <std::shared_timed_mutex> ctxLoadResource( manager->lockResourceContest );
-            
-            // Get the resource that we are meant to load.
-            reg_streaming_type *typeInfo = manager->GetStreamingTypeAtID( request.resID );
-
-            if ( typeInfo )
-            {
-                StreamingTypeInterface *streamingType = typeInfo->manager;
-
-                // Ensure that we have enough space in our loading buffer to store the resource.
-                size_t resourceSize = resToLoad->resourceSize;
-                {
-                    if ( channel->dataBuffer.size() < resourceSize )
-                    {
-                        channel->dataBuffer.resize( resourceSize );
-                    }
-                }
-
-                void *dataBuffer = channel->dataBuffer.data();
-
-                // Load this resource.
-                ident_t localID = ( request.resID - typeInfo->base );
-
-                resToLoad->location->fetchData( dataBuffer );
-
-                // Transition state from BUFFERING to LOADING.
-                resToLoad->status = eResourceStatus::LOADING;
-
-                // Give this data to the runtime.
-                streamingType->LoadResource( localID, dataBuffer, resourceSize );
-
-                // We are now loaded!
-                resToLoad->status = eResourceStatus::LOADED;
-
-                manager->totalStreamingMemoryUsage += resourceSize;
-            }
+            manager->NativeProcessStreamingRequest( request, channel, resToLoad );
         }
 
         // Need to clear activity flag.
@@ -174,6 +158,67 @@ void StreamMan::StreamingChannelRuntime( void *ud )
     }
 
     return;
+}
+
+void StreamMan::NativeProcessStreamingRequest( const Channel::request_t& request, Channel *loadingChannel, Resource *resToLoad )
+{
+    shared_lock_acquire <std::shared_timed_mutex> ctxLoadResource( this->lockResourceContest );
+            
+    // Get the resource that we are meant to load.
+    reg_streaming_type *typeInfo = this->GetStreamingTypeAtID( request.resID );
+
+    if ( typeInfo )
+    {
+        StreamingTypeInterface *streamingType = typeInfo->manager;
+
+        size_t resourceSize = resToLoad->resourceSize;
+
+        ident_t localID = ( request.resID - typeInfo->base );
+
+        if ( request.reqType == Channel::eRequestType::LOAD )
+        {
+            assert( loadingChannel != NULL );
+
+            // Ensure that we have enough space in our loading buffer to store the resource.
+            {
+                if ( loadingChannel->dataBuffer.size() < resourceSize )
+                {
+                    loadingChannel->dataBuffer.resize( resourceSize );
+                }
+            }
+
+            void *dataBuffer = loadingChannel->dataBuffer.data();
+
+            // Load this resource.
+            resToLoad->location->fetchData( dataBuffer );
+
+            // Transition state from BUFFERING to LOADING.
+            resToLoad->status = eResourceStatus::LOADING;
+
+            // Give this data to the runtime.
+            streamingType->LoadResource( localID, dataBuffer, resourceSize );
+
+            // We are now loaded!
+            resToLoad->status = eResourceStatus::LOADED;
+
+            this->totalStreamingMemoryUsage += resourceSize;
+        }
+        else if ( request.reqType == Channel::eRequestType::UNLOAD )
+        {
+            // Just unload this crap.
+            streamingType->UnloadResource( localID );
+
+            // We are not loaded anymore, meow.
+            this->totalStreamingMemoryUsage -= resourceSize;
+
+            // Unloaded :)
+            resToLoad->status = eResourceStatus::UNLOADED;
+        }
+        else
+        {
+            assert( 0 );
+        }
+    }
 }
 
 StreamMan::Channel::Channel( StreamMan *manager )
@@ -212,6 +257,7 @@ StreamMan::StreamMan( unsigned int numChannels ) : totalStreamingMemoryUsage( 0 
 {
     // Initialize management variables.
     this->currentChannelID = 0;
+    this->isTerminating = false;
 
     // Spawn channels for loading.
     for ( unsigned int n = 0; n < numChannels; n++ )
@@ -222,19 +268,47 @@ StreamMan::StreamMan( unsigned int numChannels ) : totalStreamingMemoryUsage( 0 
 
 StreamMan::~StreamMan( void )
 {
+    this->isTerminating = true;
+
     // Clear all channels.
+    // We just want to do things on the main thread.
     {
         this->channels.clear();
     }
+
+    // Unload all resources.
+    for ( std::pair <const ident_t, Resource>& loadedRes : this->resources )
+    {
+        Channel::request_t unloadReq;
+        unloadReq.reqType = Channel::eRequestType::UNLOAD;
+        unloadReq.resID = loadedRes.first;
+
+        NativeProcessStreamingRequest( unloadReq, NULL, &loadedRes.second );
+    }
+
+    // Anything else?
+
+    assert( this->totalStreamingMemoryUsage == 0 );
 }
 
-bool StreamMan::Request( ident_t id )
+void StreamMan::NativePushChannelRequest( Channel *channel, Channel::request_t request )
 {
-    // Send this resource loading request to an available Channel.
-    // Channels take loading requests on their own threads and provide data to the engine.
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxPushChannelRequest( channel->channelLock );
 
-    shared_lock_acquire <std::shared_timed_mutex> ctxChannelConsistency( this->lockResourceContest );
+    assert( channel != NULL );
 
+    channel->requests.push_back( std::move( request ) );
+
+    // We have to lock the channel as active.
+    // This is required to properly wait until it has finished loading.
+    channel->isActive = true;
+
+    // Notify the channel that a new request is available!
+    ReleaseSemaphore( channel->semRequestCount, 1, NULL );
+}
+
+void StreamMan::NativePushStreamingRequest( Channel::request_t request )
+{
     size_t channelCount = this->channels.size();
 
     unsigned int selChannel = ( this->currentChannelID++ % channelCount );
@@ -243,22 +317,41 @@ bool StreamMan::Request( ident_t id )
     {
         Channel *channel = this->channels[ selChannel ].get();
 
-        exclusive_lock_acquire <std::shared_timed_mutex> ctxPushChannelRequest( channel->channelLock );
-
-        assert( channel != NULL );
-
-        Channel::request_t newRequest;
-        newRequest.resID = id;
-
-        channel->requests.push_back( std::move( newRequest ) );
-
-        // We have to lock the channel as active.
-        // This is required to properly wait until it has finished loading.
-        channel->isActive = true;
-
-        // Notify the channel that a new request is available!
-        ReleaseSemaphore( channel->semRequestCount, 1, NULL );
+        NativePushChannelRequest( channel, std::move( request ) );
     }
+}
+
+bool StreamMan::Request( ident_t id )
+{
+    // Don't allow requests if we are terminating.
+    if ( isTerminating )
+        return false;
+
+    // Send this resource loading request to an available Channel.
+    // Channels take loading requests on their own threads and provide data to the engine.
+
+    shared_lock_acquire <std::shared_timed_mutex> ctxChannelConsistency( this->lockResourceContest );
+
+    Channel::request_t newRequest;
+    newRequest.reqType = Channel::eRequestType::LOAD;
+    newRequest.resID = id;
+
+    NativePushStreamingRequest( newRequest );
+
+    return true;
+}
+
+bool StreamMan::Unload( ident_t id )
+{
+    // We do not want to handle unloading on the main thread, because it might be pretty heavy too!
+
+    shared_lock_acquire <std::shared_timed_mutex> ctxChannelConsistency( this->lockResourceContest );
+    
+    Channel::request_t newRequest;
+    newRequest.reqType = Channel::eRequestType::UNLOAD;
+    newRequest.resID = id;
+
+    NativePushStreamingRequest( newRequest );
 
     return true;
 }
@@ -365,7 +458,7 @@ void StreamMan::ClearResourcesAtSlot( ident_t resID, ident_t range )
         ident_t curID = ( off + resID );
 
         // This is equivalent to unlinking it.
-        this->UnlinkResourceNative( curID );
+        this->UnlinkResourceNative( curID, false );
     }
 }
 
@@ -439,15 +532,16 @@ bool StreamMan::LinkResource( ident_t resID, std::string name, ResourceLocation 
     newLink.name = name;
     newLink.location = loc;
     newLink.status = eResourceStatus::UNLOADED;
+    newLink.isAllowedToLoad = true;
 
     newLink.resourceSize = loc->getDataSize();
 
-    this->resources[ resID ] = std::move( newLink );
+    this->resources.insert( std::pair <ident_t, Resource> ( resID, std::move( newLink ) ) );
 
     return true;
 }
-// evil meow.
-bool StreamMan::UnlinkResourceNative( ident_t resID )
+// :)
+bool StreamMan::UnlinkResourceNative( ident_t resID, bool doLock )
 {
     bool hasUnlinked = false;
 
@@ -458,8 +552,58 @@ bool StreamMan::UnlinkResourceNative( ident_t resID )
 
         if ( iter != this->resources.end() )
         {
+            // We have to uninstance this resource, if it is instanced.
+            // Do that safely pls.
+            {
+                Resource *res = &iter->second;
+
+                res->isAllowedToLoad = false;
+
+                bool doesNeedUnload;
+                {
+                    if ( doLock )
+                    {
+                        this->lockResourceContest.lock_shared();
+                    }
+
+                    doesNeedUnload = ( res->status != eResourceStatus::UNLOADED );
+
+                    if ( doLock )
+                    {
+                        this->lockResourceContest.unlock_shared();
+                    }
+                }
+
+                if ( doesNeedUnload )
+                {
+                    Channel::request_t unloadRequest;
+                    unloadRequest.reqType = Channel::eRequestType::UNLOAD;
+                    unloadRequest.resID = resID;
+
+                    NativePushStreamingRequest( std::move( unloadRequest ) );
+
+                    // Wait for it to finish unloading.
+                    while ( res->status != eResourceStatus::UNLOADED )
+                    {
+                        this->LoadingBarrier();
+                    }
+
+                    assert( res->status == eResourceStatus::UNLOADED );
+                }
+            }
+
+            if ( doLock )
+            {
+                this->lockResourceContest.lock();
+            }
+
             // OK!
             this->resources.erase( iter );
+
+            if ( doLock )
+            {
+                this->lockResourceContest.unlock();
+            }
 
             hasUnlinked = true;
         }
@@ -470,9 +614,7 @@ bool StreamMan::UnlinkResourceNative( ident_t resID )
 
 bool StreamMan::UnlinkResource( ident_t resID )
 {
-    exclusive_lock_acquire <std::shared_timed_mutex> ctxUnlinkResource( this->lockResourceContest );
-
-    return UnlinkResourceNative( resID );
+    return UnlinkResourceNative( resID, true );
 }
 
 };

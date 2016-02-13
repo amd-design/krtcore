@@ -75,7 +75,26 @@ int Main::Run(const ProgramArguments& arguments)
 
 	manager.Request(0);
 	manager.LoadingBarrier();
+
+    // Check for loaded resource :)
+    {
+        streaming::StreamingStats stats;
+
+        manager.GetStatistics( stats );
+
+        assert( stats.memoryInUse != 0 );
+    }
+
 	manager.UnlinkResource(0); // why does this not unload the resource?
+
+    // Now check again.
+    {
+        streaming::StreamingStats stats;
+
+        manager.GetStatistics( stats );
+
+        assert( stats.memoryInUse == 0 );
+    }
 
 	unknown();
 	unknown();

@@ -57,6 +57,7 @@ struct StreamMan
 
     bool Request( ident_t id );
     bool CancelRequest( ident_t id );
+    bool Unload( ident_t id );
 
     void LoadingBarrier( void );
 
@@ -80,9 +81,22 @@ private:
 
     struct Resource
     {
+        inline Resource( void )
+        {}
+
+        inline Resource( Resource&& right ) : status()
+        {
+            this->name = std::move( right.name );
+            this->status = right.status.load();
+            this->location = right.location;
+            this->isAllowedToLoad = right.isAllowedToLoad;
+            this->resourceSize = right.resourceSize;
+        }
+
         std::string name;
-        eResourceStatus status;
+        std::atomic <eResourceStatus> status;
         ResourceLocation *location;
+        bool isAllowedToLoad;
 
         // Meta-data.
         size_t resourceSize;
@@ -133,7 +147,7 @@ private:
 
     void ClearResourcesAtSlot( ident_t resID, ident_t range );
 
-    bool UnlinkResourceNative( ident_t resID );
+    bool UnlinkResourceNative( ident_t resID, bool doLock );
 
     std::vector <reg_streaming_type> types;
 
@@ -142,14 +156,22 @@ private:
         Channel( StreamMan *manager );
         ~Channel( void );
 
+        enum class eRequestType
+        {
+            LOAD,
+            UNLOAD
+        };
+
         struct request_t
         {
             request_t( void )
             {
                 this->resID = -1;
+                this->reqType = eRequestType::UNLOAD;
             }
 
             ident_t resID;
+            eRequestType reqType;
         };
 
         StreamMan *manager;
@@ -173,6 +195,11 @@ private:
 
     std::vector <std::unique_ptr <Channel> > channels;
 
+    void NativeProcessStreamingRequest( const Channel::request_t& request, Channel *loadingChannel, Resource *resToLoad );
+
+    void NativePushChannelRequest( Channel *channel, Channel::request_t request );
+    void NativePushStreamingRequest( Channel::request_t request );
+
     struct channel_param
     {
         StreamMan *manager;
@@ -184,6 +211,8 @@ private:
 
     std::atomic <size_t> maxMemory;
     std::atomic <size_t> totalStreamingMemoryUsage;
+
+    bool isTerminating;
 };
 
 }
