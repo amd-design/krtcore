@@ -3,6 +3,8 @@
 
 #include <windows.h>
 
+#define STREAMING_DEFAULT_MAX_MEMORY            10000000 //meow
+
 // NOTE that this is a very new system that needs ironing out bugs.
 // So report any issue that you can find!
 
@@ -10,6 +12,38 @@ namespace krt
 {
 namespace streaming
 {
+
+template <typename lockType>
+struct shared_lock_acquire
+{
+    inline shared_lock_acquire( lockType& theLock ) : theLock( theLock )
+    {
+        theLock.lock_shared();
+    }
+
+    inline ~shared_lock_acquire( void )
+    {
+        theLock.unlock_shared();
+    }
+
+    lockType& theLock;
+};
+
+template <typename lockType>
+struct exclusive_lock_acquire
+{
+    inline exclusive_lock_acquire( lockType& theLock ) : theLock( theLock )
+    {
+        theLock.lock();
+    }
+
+    inline ~exclusive_lock_acquire( void )
+    {
+        theLock.unlock();
+    }
+
+    lockType& theLock;
+};
 
 void StreamMan::StreamingChannelRuntime( void *ud )
 {
@@ -29,26 +63,26 @@ void StreamMan::StreamingChannelRuntime( void *ud )
     {
         // Wait for requests to become available.
         {
-			HANDLE waitHandles[] =
-			{
-				channel->terminationEvent,
-				channel->semRequestCount
-			};
+            HANDLE waitHandles[] =
+            {
+                channel->terminationEvent,
+                channel->semRequestCount
+            };
 
-			DWORD waitResult = WaitForMultipleObjects( _countof(waitHandles), waitHandles, FALSE, INFINITE );
+            DWORD waitResult = WaitForMultipleObjects( _countof(waitHandles), waitHandles, FALSE, INFINITE );
 
-			if ( waitResult == WAIT_OBJECT_0 )
-			{
-				// Our thread termination event was signaled.
-				break;
-			}
+            if ( waitResult == WAIT_OBJECT_0 )
+            {
+                // Our thread termination event was signaled.
+                break;
+            }
         }
 
         // Take a request and fulfill it!
         bool hasRequest = false;
         Channel::request_t request;
         {
-            std::unique_lock <std::mutex> ctxFetchRequest( channel->channelLock );
+            exclusive_lock_acquire <std::shared_timed_mutex> ctxFetchRequest( channel->channelLock );
 
             if ( channel->requests.empty() == false )
             {
@@ -57,9 +91,6 @@ void StreamMan::StreamingChannelRuntime( void *ud )
                 channel->requests.pop_front();
 
                 hasRequest = true;
-
-                // Need to set us as active.
-                channel->isActive = true;
             }
         }
 
@@ -69,7 +100,7 @@ void StreamMan::StreamingChannelRuntime( void *ud )
 
         if ( hasRequest )
         {
-			std::unique_lock <std::mutex> ctxResLoadAcquire( manager->lockResourceContest );
+            exclusive_lock_acquire <std::shared_timed_mutex> ctxResLoadAcquire( manager->lockResourceContest );
 
             Resource *wantedResource = manager->GetResourceAtID( request.resID );
 
@@ -88,7 +119,7 @@ void StreamMan::StreamingChannelRuntime( void *ud )
 
         if ( resToLoad )
         {
-			std::unique_lock <std::mutex> ctxLoadResource( manager->lockResourceContest );
+            shared_lock_acquire <std::shared_timed_mutex> ctxLoadResource( manager->lockResourceContest );
             
             // Get the resource that we are meant to load.
             reg_streaming_type *typeInfo = manager->GetStreamingTypeAtID( request.resID );
@@ -121,13 +152,24 @@ void StreamMan::StreamingChannelRuntime( void *ud )
 
                 // We are now loaded!
                 resToLoad->status = eResourceStatus::LOADED;
+
+                manager->totalStreamingMemoryUsage += resourceSize;
             }
         }
 
         // Need to clear activity flag.
         if ( hasRequest )
         {
-            channel->isActive = false;
+            exclusive_lock_acquire <std::shared_timed_mutex> ctxChannelConsistency( channel->channelLock );
+
+            // We are not active anymore if all requests are fulfilled.
+            if ( channel->requests.empty() == true )
+            {
+                channel->isActive = false;
+
+                // We can unlock any waiting people.
+                channel->condIsActive.notify_all();
+            }
         }
     }
 
@@ -144,28 +186,29 @@ StreamMan::Channel::Channel( StreamMan *manager )
 
     // Semaphore request availability semaphore.
     this->semRequestCount = CreateSemaphoreW( NULL, 0, 9000, NULL );
-	this->terminationEvent = CreateEventW( NULL, TRUE, FALSE, NULL );
+    this->terminationEvent = CreateEventW( NULL, TRUE, FALSE, NULL );
+
     this->isActive = false;
 
-	this->thread = std::thread([=] ()
-	{
-		StreamingChannelRuntime(params);
-	});
+    this->thread = std::thread([=] ()
+    {
+        StreamingChannelRuntime(params);
+    });
 }
 
 StreamMan::Channel::~Channel( void )
 {
     // Wait for thread termination.
-	SetEvent(terminationEvent);
+    SetEvent(terminationEvent);
 
     this->thread.join();
 
     // Clean up management stuff.
     CloseHandle( this->semRequestCount );
-	CloseHandle( this->terminationEvent );
+    CloseHandle( this->terminationEvent );
 }
 
-StreamMan::StreamMan( unsigned int numChannels )
+StreamMan::StreamMan( unsigned int numChannels ) : totalStreamingMemoryUsage( 0 ), maxMemory( STREAMING_DEFAULT_MAX_MEMORY )
 {
     // Initialize management variables.
     this->currentChannelID = 0;
@@ -190,7 +233,7 @@ bool StreamMan::Request( ident_t id )
     // Send this resource loading request to an available Channel.
     // Channels take loading requests on their own threads and provide data to the engine.
 
-	std::unique_lock <std::mutex> ctxChannelConsistency( this->lockResourceContest );
+    shared_lock_acquire <std::shared_timed_mutex> ctxChannelConsistency( this->lockResourceContest );
 
     size_t channelCount = this->channels.size();
 
@@ -200,7 +243,7 @@ bool StreamMan::Request( ident_t id )
     {
         Channel *channel = this->channels[ selChannel ].get();
 
-		std::unique_lock <std::mutex> ctxPushChannelRequest( channel->channelLock );
+        exclusive_lock_acquire <std::shared_timed_mutex> ctxPushChannelRequest( channel->channelLock );
 
         assert( channel != NULL );
 
@@ -208,6 +251,10 @@ bool StreamMan::Request( ident_t id )
         newRequest.resID = id;
 
         channel->requests.push_back( std::move( newRequest ) );
+
+        // We have to lock the channel as active.
+        // This is required to properly wait until it has finished loading.
+        channel->isActive = true;
 
         // Notify the channel that a new request is available!
         ReleaseSemaphore( channel->semRequestCount, 1, NULL );
@@ -227,43 +274,41 @@ bool StreamMan::CancelRequest( ident_t id )
 void StreamMan::LoadingBarrier( void )
 {
     // Wait until all requests have been processed by all channels.
-    bool areResourcesLoaded = false;
 
-    while ( !areResourcesLoaded )
+    // Check all channels.
+    for ( auto& curChannel : this->channels )
     {
-        bool isAnyActivity = false;
+        std::unique_lock <std::mutex> lockWaitActive ( curChannel->lockIsActive );
 
-        // Check all channels.
-        for ( auto& curChannel : this->channels )
+        curChannel->condIsActive.wait( lockWaitActive,
+            [&]
         {
-			std::unique_lock <std::mutex> ctxCheckChannelActivity( curChannel->channelLock );
+            shared_lock_acquire <std::shared_timed_mutex> ctxChannelConsistency( curChannel->channelLock );
 
-            if ( curChannel->requests.empty() == false || curChannel->isActive )
-            {
-                isAnyActivity = true;
-            }
-        }
-
-        if ( !isAnyActivity )
-        {
-            areResourcesLoaded = true;
-        }
-        else
-        {
-            // Let us relax for a second.
-            Sleep( 1 );
-        }
+            return ( ! ( curChannel->requests.empty() == false || curChannel->isActive ) );
+        });
     }
 }
 
 StreamMan::eResourceStatus StreamMan::GetResourceStatus( ident_t id ) const
 {
+    shared_lock_acquire <std::shared_timed_mutex> ctxResourceStateFetch( this->lockResourceContest );
+
+    const Resource *theRes = this->GetConstResourceAtID( id );
+
+    if ( theRes )
+    {
+        return theRes->status;
+    }
+
+    // Dunno :(
     return eResourceStatus::UNLOADED;
 }
 
 void StreamMan::GetStatistics( StreamingStats& statsOut ) const
 {
-    // TODO.
+    statsOut.maxMemory = this->maxMemory;
+    statsOut.memoryInUse = this->totalStreamingMemoryUsage;
 }
 
 bool StreamMan::CheckTypeRegionConflict( ident_t base, ident_t range ) const
@@ -326,7 +371,7 @@ void StreamMan::ClearResourcesAtSlot( ident_t resID, ident_t range )
 
 bool StreamMan::RegisterResourceType( ident_t base, ident_t range, StreamingTypeInterface *intf )
 {
-	std::unique_lock <std::mutex> ctxRegisterType( this->lockResourceContest );
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxRegisterType( this->lockResourceContest );
 
     // Register an entirely new streaming type, just for your enjoyment!
 
@@ -349,7 +394,7 @@ bool StreamMan::RegisterResourceType( ident_t base, ident_t range, StreamingType
 
 bool StreamMan::UnregisterResourceType( ident_t base )
 {
-	std::unique_lock <std::mutex> ctxUnregisterType( this->lockResourceContest );
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxUnregisterType( this->lockResourceContest );
 
     // We get the streaming type at the given offset and unregister it.
     reg_streaming_type *streamType = GetStreamingTypeAtID( base );
@@ -377,7 +422,7 @@ bool StreamMan::UnregisterResourceType( ident_t base )
 
 bool StreamMan::LinkResource( ident_t resID, std::string name, ResourceLocation *loc )
 {
-	std::unique_lock <std::mutex> ctxLinkResource( this->lockResourceContest );
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxLinkResource( this->lockResourceContest );
 
     // Is the slot already taken? Then fail.
     {
@@ -401,7 +446,7 @@ bool StreamMan::LinkResource( ident_t resID, std::string name, ResourceLocation 
 
     return true;
 }
-
+// evil meow.
 bool StreamMan::UnlinkResourceNative( ident_t resID )
 {
     bool hasUnlinked = false;
@@ -425,7 +470,7 @@ bool StreamMan::UnlinkResourceNative( ident_t resID )
 
 bool StreamMan::UnlinkResource( ident_t resID )
 {
-	std::unique_lock <std::mutex> ctxUnlinkResource( this->lockResourceContest );
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxUnlinkResource( this->lockResourceContest );
 
     return UnlinkResourceNative( resID );
 }

@@ -2,6 +2,8 @@
 
 #include <atomic>
 
+#include <shared_mutex>
+
 #include <utils/DataSlice.h>
 
 // Windows placeholder
@@ -90,12 +92,22 @@ private:
 
     resMap_t resources;
 
-	std::mutex lockResourceContest;
+    mutable std::shared_timed_mutex lockResourceContest;
     // this lock has to be taken when the resource system state is changing.
 
     inline Resource* GetResourceAtID( ident_t id )
     {
         resMap_t::iterator foundIter = resources.find( id );
+
+        if ( foundIter == resources.end() )
+            return NULL;
+
+        return &(*foundIter).second;
+    }
+
+    inline const Resource* GetConstResourceAtID( ident_t id ) const
+    {
+        resMap_t::const_iterator foundIter = resources.find( id );
 
         if ( foundIter == resources.end() )
             return NULL;
@@ -145,10 +157,13 @@ private:
         std::list <request_t> requests;
 
         std::thread thread;
-        std::mutex channelLock;   // access lock to fields.
+        std::shared_timed_mutex channelLock;  // access lock to fields.
+
+        std::mutex lockIsActive;
+        std::condition_variable condIsActive;
 
         HANDLE semRequestCount;
-		HANDLE terminationEvent;
+        HANDLE terminationEvent;
 
         bool isActive;
 
@@ -166,6 +181,9 @@ private:
 
     // Some management variables.
     std::atomic <unsigned int> currentChannelID;    // used to balance the load between channels.
+
+    std::atomic <size_t> maxMemory;
+    std::atomic <size_t> totalStreamingMemoryUsage;
 };
 
 }
