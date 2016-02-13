@@ -1,11 +1,15 @@
-#ifndef _STREAMING_RUNTIME_
-#define _STREAMING_RUNTIME_
+#pragma once
 
 #include <atomic>
 
-#include <CExecutiveManager.h>
+#include <utils/DataSlice.h>
 
-namespace Streaming
+// Windows placeholder
+typedef void* HANDLE;
+
+namespace krt
+{
+namespace streaming
 {
 
 typedef int ident_t;
@@ -68,7 +72,7 @@ private:
     // METHODS THAT ARE PRIVATE ARE MEANT TO BE PRIVATE.
     // Be careful exposing anything because this is a threaded structure!
 
-    static void __stdcall StreamingChannelRuntime( NativeExecutive::CExecThread *theThread, void *ud );
+    static void StreamingChannelRuntime( void *ud );
 
     bool CheckTypeRegionConflict( ident_t base, ident_t range ) const;
 
@@ -86,7 +90,7 @@ private:
 
     resMap_t resources;
 
-    NativeExecutive::CReadWriteLock *lockResourceContest;
+	std::mutex lockResourceContest;
     // this lock has to be taken when the resource system state is changing.
 
     inline Resource* GetResourceAtID( ident_t id )
@@ -140,10 +144,11 @@ private:
 
         std::list <request_t> requests;
 
-        NativeExecutive::CExecThread *thread;
-        NativeExecutive::CReadWriteLock *channelLock;   // access lock to fields.
+        std::thread thread;
+        std::mutex channelLock;   // access lock to fields.
 
         HANDLE semRequestCount;
+		HANDLE terminationEvent;
 
         bool isActive;
 
@@ -151,7 +156,7 @@ private:
         std::vector <char> dataBuffer;
     };
 
-    std::vector <Channel*> channels;
+    std::vector <std::unique_ptr <Channel> > channels;
 
     struct channel_param
     {
@@ -159,12 +164,9 @@ private:
         Channel *channel;
     };
 
-    NativeExecutive::CExecutiveManager *execMan;
-
     // Some management variables.
     std::atomic <unsigned int> currentChannelID;    // used to balance the load between channels.
 };
 
 }
-
-#endif //_STREAMING_RUNTIME_ by Martin Turski
+}

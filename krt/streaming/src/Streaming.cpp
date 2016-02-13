@@ -1,43 +1,18 @@
 #include "StdInc.h"
-#include "streaming.h"
+#include "Streaming.h"
 
-using namespace NativeExecutive;
+#include <windows.h>
 
 // NOTE that this is a very new system that needs ironing out bugs.
 // So report any issue that you can find!
 
-namespace Streaming
+namespace krt
+{
+namespace streaming
 {
 
-void StreamMan::StreamingChannelRuntime( CExecThread *theThread, void *ud )
+void StreamMan::StreamingChannelRuntime( void *ud )
 {
-    struct GuardedResourceWait : public NativeExecutive::hazardPreventionInterface
-    {
-        inline GuardedResourceWait( StreamMan *streamMan, CExecutiveManager *execMan, HANDLE semWait )
-        {
-            this->streamMan = streamMan;
-            this->execMan = execMan;
-            this->semWait = semWait;
-
-            NativeExecutive::PushHazard( execMan, this );
-        }
-
-        inline ~GuardedResourceWait( void )
-        {
-            NativeExecutive::PopHazard( this->execMan );
-        }
-
-        void TerminateHazard( void ) override
-        {
-            // We want to give the thread a chance to terminate.
-            ReleaseSemaphore( this->semWait, 1, NULL );
-        }
-
-        StreamMan *streamMan;
-        CExecutiveManager *execMan;
-        HANDLE semWait;
-    };
-
     StreamMan *manager = NULL;
     Channel *channel = NULL;
     {
@@ -49,30 +24,31 @@ void StreamMan::StreamingChannelRuntime( CExecThread *theThread, void *ud )
         // We must clean up after ourselves.
         delete params;
     }
-    
-    CExecutiveManager *execMan = manager->execMan;
 
     while ( true )
     {
-        // We must always check for termination, so we can cleanly exit.
-        execMan->CheckHazardCondition();
-
         // Wait for requests to become available.
         {
-            GuardedResourceWait waitGuard( manager, execMan, channel->semRequestCount );
+			HANDLE waitHandles[] =
+			{
+				channel->terminationEvent,
+				channel->semRequestCount
+			};
 
-            // Need to check again.
-            execMan->CheckHazardCondition();
+			DWORD waitResult = WaitForMultipleObjects( _countof(waitHandles), waitHandles, FALSE, INFINITE );
 
-            // Friggin thread hazards.
-            WaitForSingleObject( channel->semRequestCount, INFINITE );
+			if ( waitResult == WAIT_OBJECT_0 )
+			{
+				// Our thread termination event was signaled.
+				break;
+			}
         }
 
         // Take a request and fulfill it!
         bool hasRequest = false;
         Channel::request_t request;
         {
-            CReadWriteWriteContext <CReadWriteLock> ctxFetchRequest( channel->channelLock );
+            std::unique_lock <std::mutex> ctxFetchRequest( channel->channelLock );
 
             if ( channel->requests.empty() == false )
             {
@@ -93,7 +69,7 @@ void StreamMan::StreamingChannelRuntime( CExecThread *theThread, void *ud )
 
         if ( hasRequest )
         {
-            CReadWriteWriteContext <CReadWriteLock> ctxResLoadAcquire( manager->lockResourceContest );
+			std::unique_lock <std::mutex> ctxResLoadAcquire( manager->lockResourceContest );
 
             Resource *wantedResource = manager->GetResourceAtID( request.resID );
 
@@ -112,7 +88,7 @@ void StreamMan::StreamingChannelRuntime( CExecThread *theThread, void *ud )
 
         if ( resToLoad )
         {
-            CReadWriteReadContext <CReadWriteLock> ctxLoadResource( manager->lockResourceContest );
+			std::unique_lock <std::mutex> ctxLoadResource( manager->lockResourceContest );
             
             // Get the resource that we are meant to load.
             reg_streaming_type *typeInfo = manager->GetStreamingTypeAtID( request.resID );
@@ -166,52 +142,38 @@ StreamMan::Channel::Channel( StreamMan *manager )
     params->manager = manager;
     params->channel = this;
 
-    // Lock used to access the resource list and stuff.
-    this->channelLock = manager->execMan->CreateReadWriteLock();
-
     // Semaphore request availability semaphore.
     this->semRequestCount = CreateSemaphoreW( NULL, 0, 9000, NULL );
+	this->terminationEvent = CreateEventW( NULL, TRUE, FALSE, NULL );
     this->isActive = false;
 
-    this->thread =
-        manager->execMan->CreateThread( StreamingChannelRuntime, params );
-
-    // Start the thread right away.
-    this->thread->Resume();
+	this->thread = std::thread([=] ()
+	{
+		StreamingChannelRuntime(params);
+	});
 }
 
 StreamMan::Channel::~Channel( void )
 {
     // Wait for thread termination.
-    manager->execMan->TerminateThread( this->thread, true );
+	SetEvent(terminationEvent);
 
-    manager->execMan->CloseThread( this->thread );
-
-    this->thread = NULL;
+    this->thread.join();
 
     // Clean up management stuff.
     CloseHandle( this->semRequestCount );
-
-    manager->execMan->CloseReadWriteLock( this->channelLock );
+	CloseHandle( this->terminationEvent );
 }
 
 StreamMan::StreamMan( unsigned int numChannels )
 {
-    this->execMan = CExecutiveManager::Create();
-
-    assert( this->execMan != NULL );
-
     // Initialize management variables.
     this->currentChannelID = 0;
-
-    this->lockResourceContest = this->execMan->CreateReadWriteLock();
 
     // Spawn channels for loading.
     for ( unsigned int n = 0; n < numChannels; n++ )
     {
-        Channel *newChannel = new Channel( this );
-
-        this->channels.push_back( newChannel );
+        this->channels.push_back( std::make_unique<Channel>(this) );
     }
 }
 
@@ -219,19 +181,8 @@ StreamMan::~StreamMan( void )
 {
     // Clear all channels.
     {
-        for ( Channel *runningChannel : this->channels )
-        {
-            delete runningChannel;
-        }
-
         this->channels.clear();
     }
-
-    // Clear management things.
-    this->execMan->CloseReadWriteLock( this->lockResourceContest );
-
-    // Kill threading stuff.
-    CExecutiveManager::Delete( this->execMan );
 }
 
 bool StreamMan::Request( ident_t id )
@@ -239,7 +190,7 @@ bool StreamMan::Request( ident_t id )
     // Send this resource loading request to an available Channel.
     // Channels take loading requests on their own threads and provide data to the engine.
 
-    CReadWriteReadContext <CReadWriteLock> ctxChannelConsistency( this->lockResourceContest );
+	std::unique_lock <std::mutex> ctxChannelConsistency( this->lockResourceContest );
 
     size_t channelCount = this->channels.size();
 
@@ -247,9 +198,9 @@ bool StreamMan::Request( ident_t id )
 
     // Give this channel the request.
     {
-        Channel *channel = this->channels[ selChannel ];
+        Channel *channel = this->channels[ selChannel ].get();
 
-        CReadWriteWriteContext <CReadWriteLock> ctxPushChannelRequest( channel->channelLock );
+		std::unique_lock <std::mutex> ctxPushChannelRequest( channel->channelLock );
 
         assert( channel != NULL );
 
@@ -283,9 +234,9 @@ void StreamMan::LoadingBarrier( void )
         bool isAnyActivity = false;
 
         // Check all channels.
-        for ( Channel *curChannel : this->channels )
+        for ( auto& curChannel : this->channels )
         {
-            CReadWriteReadContext <CReadWriteLock> ctxCheckChannelActivity( curChannel->channelLock );
+			std::unique_lock <std::mutex> ctxCheckChannelActivity( curChannel->channelLock );
 
             if ( curChannel->requests.empty() == false || curChannel->isActive )
             {
@@ -375,7 +326,7 @@ void StreamMan::ClearResourcesAtSlot( ident_t resID, ident_t range )
 
 bool StreamMan::RegisterResourceType( ident_t base, ident_t range, StreamingTypeInterface *intf )
 {
-    CReadWriteWriteContext <CReadWriteLock> ctxRegisterType( this->lockResourceContest );
+	std::unique_lock <std::mutex> ctxRegisterType( this->lockResourceContest );
 
     // Register an entirely new streaming type, just for your enjoyment!
 
@@ -398,7 +349,7 @@ bool StreamMan::RegisterResourceType( ident_t base, ident_t range, StreamingType
 
 bool StreamMan::UnregisterResourceType( ident_t base )
 {
-    CReadWriteWriteContext <CReadWriteLock> ctxUnregisterType( this->lockResourceContest );
+	std::unique_lock <std::mutex> ctxUnregisterType( this->lockResourceContest );
 
     // We get the streaming type at the given offset and unregister it.
     reg_streaming_type *streamType = GetStreamingTypeAtID( base );
@@ -426,7 +377,7 @@ bool StreamMan::UnregisterResourceType( ident_t base )
 
 bool StreamMan::LinkResource( ident_t resID, std::string name, ResourceLocation *loc )
 {
-    CReadWriteWriteContext <CReadWriteLock> ctxLinkResource( this->lockResourceContest );
+	std::unique_lock <std::mutex> ctxLinkResource( this->lockResourceContest );
 
     // Is the slot already taken? Then fail.
     {
@@ -474,9 +425,10 @@ bool StreamMan::UnlinkResourceNative( ident_t resID )
 
 bool StreamMan::UnlinkResource( ident_t resID )
 {
-    CReadWriteWriteContext <CReadWriteLock> ctxUnlinkResource( this->lockResourceContest );
+	std::unique_lock <std::mutex> ctxUnlinkResource( this->lockResourceContest );
 
     return UnlinkResourceNative( resID );
 }
 
 };
+}
