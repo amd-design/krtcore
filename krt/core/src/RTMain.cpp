@@ -1,6 +1,6 @@
+#include "StdInc.h"
 #include "ProgramArguments.h"
 #include "RTMain.h"
-#include "StdInc.h"
 
 #include <stdio.h>
 
