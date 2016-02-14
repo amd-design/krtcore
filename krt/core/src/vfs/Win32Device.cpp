@@ -74,35 +74,37 @@ size_t Win32Device::ReadBulk(THandle handle, uint64_t ptr, void* outBuffer, size
 	OVERLAPPED overlapped = {};
 	overlapped.Offset     = (ptr & 0xFFFFFFFF);
 	overlapped.OffsetHigh = ptr >> 32;
-	overlapped.hEvent     = CreateEventA(NULL, false, false, NULL);
 
-	// Fuck this optimization shit. You know how kernel objects like files can be unpredictable?
-	// Well, read this:
-	// https://msdn.microsoft.com/en-us/library/windows/desktop/ms683209%28v=vs.85%29.aspx
-	// "If the hEvent member of the OVERLAPPED structure is NULL, the system uses the state of the hFile handle to
-	// signal when the operation has been completed. Use of file, named pipe, or communications-device handles for
-	// this purpose is discouraged. It is safer (...)"
-	// I am pretty sure you can optimize this usage of OVERLAPPED somehow, like making a pool of it with allocated
-	// Event objects. Or do you want to return to synchronous API instead?
-
-	BOOL result = ReadFile(reinterpret_cast<HANDLE>(handle), outBuffer, size, nullptr, &overlapped);
+	BOOL result    = ReadFile(reinterpret_cast<HANDLE>(handle), outBuffer, size, nullptr, &overlapped);
+	bool ioPending = false;
 
 	if (!result)
 	{
-		if (GetLastError() != ERROR_IO_PENDING)
+		ioPending = (GetLastError() == ERROR_IO_PENDING);
+
+		if (!ioPending)
 		{
 			return -1;
 		}
 	}
 
+	// wait for the IO to complete in a polling fashion
+	// this should be safe enough as nobody expects IO to be time-critical
+	if (ioPending)
+	{
+		while (!HasOverlappedIoCompleted(&overlapped))
+		{
+			Sleep(5);
+		}
+	}
+
+	// get error result/bytes transferred the 'safe' way (one could also use Internal/InternalHigh, but despite
+	// being standardized those are scarcely documented)
 	DWORD bytesRead;
-	if (!GetOverlappedResult(reinterpret_cast<HANDLE>(handle), &overlapped, &bytesRead, TRUE))
+	if (!GetOverlappedResult(reinterpret_cast<HANDLE>(handle), &overlapped, &bytesRead, FALSE))
 	{
 		return -1;
 	}
-
-	// Remember to close the event handle!
-	CloseHandle(overlapped.hEvent);
 
 	return bytesRead;
 }
