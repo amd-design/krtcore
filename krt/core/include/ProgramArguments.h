@@ -10,8 +10,14 @@ private:
 public:
 	ProgramArguments(int argc, char** argv);
 
+	inline explicit ProgramArguments(const std::vector<std::string>&& arguments)
+		: m_arguments(arguments)
+	{
+		
+	}
+
 	template<typename... Args>
-	ProgramArguments(Args... args)
+	explicit ProgramArguments(Args... args)
 	{
 		m_arguments = std::vector<std::string>{args...};
 	}
@@ -31,6 +37,14 @@ public:
 	inline size_t Count() const
 	{
 		return m_arguments.size();
+	}
+
+	std::string Shift()
+	{
+		std::string value = *(m_arguments.begin());
+		m_arguments.erase(m_arguments.begin());
+
+		return value;
 	}
 };
 }

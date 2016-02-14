@@ -12,6 +12,7 @@
 #include <Streaming.h>
 #include <vfs/Manager.h>
 
+#include <Console.h>
 #include <Console.Commands.h>
 
 namespace krt
@@ -150,6 +151,10 @@ int Main::Run(const ProgramArguments& arguments)
 	{
 		printf("%d %d %s\n", a, b, c.c_str());
 	});
+
+	Console::ExecuteSingleCommand("a 5 4 1000");
+	Console::AddToBuffer("a 1 2 3; a 1 2 \"hi world\"\r\na 1 2");
+	Console::ExecuteBuffer();
 
 	ConsoleCommandManager::GetInstance()->Invoke("a", ProgramArguments{ "5", "4", "a" });
 	ConsoleCommandManager::GetInstance()->Invoke("a", ProgramArguments{ "5", "4", "1000" });

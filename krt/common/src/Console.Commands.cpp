@@ -47,6 +47,9 @@ void ConsoleCommandManager::Invoke(const std::string& commandName, const Program
 
 	for (std::pair<const std::string, Entry>& entry : GetIteratorView(entryPair))
 	{
+		// clear the error buffer
+		context.errorBuffer.str("");
+
 		result = entry.second.function(context);
 
 		if (result)
