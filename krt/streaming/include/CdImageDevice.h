@@ -94,9 +94,7 @@ class CdImageDevice : public vfs::Device
 
 	std::vector<Entry> m_entries;
 
-	typedef std::map<std::string, Entry*, IgnoreCaseLess> entryLookupMap_t;
-
-	entryLookupMap_t m_entryLookup;
+	std::map<std::string, Entry*, IgnoreCaseLess> m_entryLookup;
 
 	// I do not know how what your vfs design will really be in the end,
 	// so I use a simple shared access lock by following immutability rules.

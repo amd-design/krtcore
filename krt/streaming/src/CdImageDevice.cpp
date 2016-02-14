@@ -122,7 +122,7 @@ const CdImageDevice::Entry* CdImageDevice::FindEntry(const std::string& path) co
 	std::string relativePath = path.substr(m_pathPrefix.length());
 
 	// then, look up the entry in the lookup table
-	const entryLookupMap_t::const_iterator it = m_entryLookup.find(relativePath);
+	const auto it = m_entryLookup.find(relativePath);
 
 	// if not found, return such
 	if (it == m_entryLookup.end())
