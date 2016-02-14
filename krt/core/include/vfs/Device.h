@@ -21,6 +21,8 @@ public:
 	static const THandle InvalidHandle = -1;
 
 public:
+	virtual ~Device() = default;
+
 	virtual THandle Open(const std::string& fileName, bool readOnly) = 0;
 
 	virtual THandle OpenBulk(const std::string& fileName, uint64_t* ptr);

@@ -72,6 +72,10 @@ DevicePtr Manager::GetDevice(const std::string& path)
 
 void Manager::Mount(const DevicePtr& device, const std::string& path)
 {
+	// set the path prefix on the device
+	device->SetPathPrefix(path);
+
+	// mount
 	std::lock_guard<std::recursive_mutex> lock(m_mountMutex);
 
 	// find an existing mount in the mount list to add to

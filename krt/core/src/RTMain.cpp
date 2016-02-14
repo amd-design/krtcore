@@ -6,6 +6,7 @@
 
 #include <vfs/Manager.h>
 #include <Streaming.h>
+#include <CdImageDevice.h>
 
 namespace krt
 {
@@ -19,12 +20,32 @@ int unknown()
 	return 0;
 }
 
+struct RwSectionHeader
+{
+	uint32_t type;
+	uint32_t size;
+	uint32_t libid;
+};
+
+// by aap
+inline int
+	libraryIDUnpackVersion(uint32_t libid)
+{
+	if (libid & 0xFFFF0000)
+		return (libid >> 14 & 0x3FF00) + 0x30000 |
+		(libid >> 16 & 0x3F);
+	else
+		return libid << 8;
+}
+
 class TestInterface : public streaming::StreamingTypeInterface
 {
 public:
 	virtual void LoadResource(streaming::ident_t localID, const void *data, size_t dataSize) override
 	{
-		printf("%d: %s\n", localID, std::string(reinterpret_cast<const char*>(data), dataSize).c_str());
+		const RwSectionHeader* header = reinterpret_cast<const RwSectionHeader*>(data);
+
+		printf("%d: type %d, size %d, version %x\n", localID, header->type, header->size, libraryIDUnpackVersion(header->libid));
 	}
 	virtual void UnloadResource(streaming::ident_t localID) override
 	{
@@ -43,35 +64,50 @@ private:
 	std::string m_path;
 	vfs::DevicePtr m_device;
 
+	size_t m_length;
+
 public:
 	VfsResourceProvider(const std::string& path)
 	{
 		m_path = path;
 		m_device = vfs::GetDevice(path);
+		m_length = m_device->GetLength(m_path);
 	}
 
 	virtual size_t getDataSize(void) const override
 	{
-		return m_device->GetLength(m_path);
+		return m_length;
 	}
 
 	virtual void fetchData(void *dataBuf) override
 	{
-		auto handle = m_device->Open(m_path, true);
-		m_device->Read(handle, dataBuf, m_device->GetLength(handle));
-		m_device->Close(handle);
+		uint64_t ptr;
+		auto handle = m_device->OpenBulk(m_path, &ptr);
+		m_device->ReadBulk(handle, ptr, dataBuf, m_length);
+		m_device->CloseBulk(handle);
 	}
 };
 
 int Main::Run(const ProgramArguments& arguments)
 {
+	std::shared_ptr<streaming::CdImageDevice> cdImage = std::make_shared<streaming::CdImageDevice>();
+
+	if (!strcmp(getenv("COMPUTERNAME"), "FALLARBOR"))
+	{
+		bool loadResult = cdImage->OpenImage("S:\\Games\\Steam\\steamapps\\common\\Grand Theft Auto 3\\models\\gta3.img");
+
+		assert(loadResult);
+	}
+
+	vfs::Mount(cdImage, "gta3img:/");
+
 	streaming::StreamMan manager(4);
 	TestInterface dummyInterface;
 
-	VfsResourceProvider resourceProvider("C:\\windows\\system32\\license.rtf");
+	VfsResourceProvider resourceProvider("gta3img:/male01.dff");
 
 	manager.RegisterResourceType(0, 500, &dummyInterface);
-	manager.LinkResource(0, "dummy.txt", &resourceProvider);
+	manager.LinkResource(0, "male01.dff", &resourceProvider);
 
 	manager.Request(0);
 	manager.LoadingBarrier();
