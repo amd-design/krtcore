@@ -193,7 +193,7 @@ private:
         std::vector <char> dataBuffer;
     };
 
-    std::vector <std::unique_ptr <Channel> > channels;
+    std::vector <Channel*> channels;
 
     void NativeProcessStreamingRequest( const Channel::request_t& request, Channel *loadingChannel, Resource *resToLoad );
 

@@ -2,6 +2,8 @@
 
 #include <vfs/Device.h>
 
+#include <shared_mutex>
+
 namespace krt
 {
 namespace streaming
@@ -72,7 +74,7 @@ private:
 	};
 
 private:
-	const Entry* FindEntry(const std::string& path);
+	const Entry* FindEntry(const std::string& path) const;
 
 	HandleData* AllocateHandle(THandle* outHandle);
 
@@ -92,8 +94,14 @@ private:
 	HandleData m_handles[16];
 
 	std::vector<Entry> m_entries;
+    
+    typedef std::map <std::string, Entry*, IgnoreCaseLess> entryLookupMap_t;
 
-	std::map<std::string, Entry*, IgnoreCaseLess> m_entryLookup;
+	entryLookupMap_t m_entryLookup;
+
+    // I do not know how what your vfs design will really be in the end,
+    // so I use a simple shared access lock by following immutability rules.
+    std::shared_timed_mutex lockDeviceConsistency;
 };
 }
 }

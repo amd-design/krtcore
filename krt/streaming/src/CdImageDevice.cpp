@@ -31,6 +31,8 @@ CdImageDevice::~CdImageDevice()
 
 bool CdImageDevice::OpenImage(const std::string& imagePath)
 {
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxOpenOp( this->lockDeviceConsistency );
+
 	// get the containing device, and early out if we don't have one
 	DevicePtr parentDevice = vfs::GetDevice(imagePath);
 
@@ -114,13 +116,14 @@ bool CdImageDevice::OpenImage(const std::string& imagePath)
 	return true;
 }
 
-const CdImageDevice::Entry* CdImageDevice::FindEntry(const std::string& path)
+// only THREAD-SAFE if called from SHARED-LOCK.
+const CdImageDevice::Entry* CdImageDevice::FindEntry(const std::string& path) const
 {
 	// remove the path prefix
 	std::string relativePath = path.substr(m_pathPrefix.length());
 
 	// then, look up the entry in the lookup table
-	auto it = m_entryLookup.find(relativePath);
+	const entryLookupMap_t::const_iterator it = m_entryLookup.find( relativePath );
 
 	// if not found, return such
 	if (it == m_entryLookup.end())
@@ -132,6 +135,7 @@ const CdImageDevice::Entry* CdImageDevice::FindEntry(const std::string& path)
 	return it->second;
 }
 
+// only THREAD-SAFE if called from EXCLUSIVE-LOCK.
 CdImageDevice::HandleData* CdImageDevice::AllocateHandle(THandle* outHandle)
 {
 	for (int i = 0; i < _countof(m_handles); i++)
@@ -162,6 +166,8 @@ CdImageDevice::HandleData* CdImageDevice::GetHandle(THandle inHandle)
 
 CdImageDevice::THandle CdImageDevice::Open(const std::string& fileName, bool readOnly)
 {
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxOpenImageHandle( this->lockDeviceConsistency );
+
 	// we only support read-only files
 	if (readOnly)
 	{
@@ -190,6 +196,8 @@ CdImageDevice::THandle CdImageDevice::Open(const std::string& fileName, bool rea
 
 CdImageDevice::THandle CdImageDevice::OpenBulk(const std::string& fileName, uint64_t* ptr)
 {
+    shared_lock_acquire <std::shared_timed_mutex> ctxBulkOperations( this->lockDeviceConsistency );
+
 	auto entry = FindEntry(fileName);
 
 	if (entry)
@@ -204,6 +212,9 @@ CdImageDevice::THandle CdImageDevice::OpenBulk(const std::string& fileName, uint
 
 size_t CdImageDevice::Read(THandle handle, void* outBuffer, size_t size)
 {
+    // EXLUSIVE LOCK IS REQUIRED, because you use a cached-handle approach.
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxBulkOperations( this->lockDeviceConsistency );
+
 	auto handleData = GetHandle(handle);
 
 	if (handleData)
@@ -237,11 +248,17 @@ size_t CdImageDevice::Read(THandle handle, void* outBuffer, size_t size)
 
 size_t CdImageDevice::ReadBulk(THandle handle, uint64_t ptr, void* outBuffer, size_t size)
 {
+    shared_lock_acquire <std::shared_timed_mutex> ctxBulkOperations( this->lockDeviceConsistency );
+
 	return m_parentDevice->ReadBulk(m_parentHandle, m_parentPtr + ptr, outBuffer, size);
 }
 
 bool CdImageDevice::Close(THandle handle)
 {
+    // Again, shared handle approach.
+    // We cannot let this go haywire.
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxBulkOperations( this->lockDeviceConsistency );
+
 	auto handleData = GetHandle(handle);
 
 	if (handleData)
@@ -261,6 +278,8 @@ bool CdImageDevice::CloseBulk(THandle handle)
 
 size_t CdImageDevice::Seek(THandle handle, intptr_t offset, int seekType)
 {
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxSeekHandle( this->lockDeviceConsistency );
+
 	auto handleData = GetHandle(handle);
 
 	if (handleData)
@@ -297,6 +316,8 @@ size_t CdImageDevice::Seek(THandle handle, intptr_t offset, int seekType)
 
 size_t CdImageDevice::GetLength(THandle handle)
 {
+    shared_lock_acquire <std::shared_timed_mutex> ctxImmutableOp( this->lockDeviceConsistency );
+
 	auto handleData = GetHandle(handle);
 
 	if (handleData)
@@ -309,6 +330,8 @@ size_t CdImageDevice::GetLength(THandle handle)
 
 size_t CdImageDevice::GetLength(const std::string& fileName)
 {
+    shared_lock_acquire <std::shared_timed_mutex> ctxImmutableOp( this->lockDeviceConsistency );
+
 	auto entry = FindEntry(fileName);
 
 	if (entry)
@@ -321,6 +344,10 @@ size_t CdImageDevice::GetLength(const std::string& fileName)
 
 CdImageDevice::THandle CdImageDevice::FindFirst(const std::string& folder, vfs::FindData* findData)
 {
+    // You are allocating some kind of handles, which is not thread-safe.
+    // So we gotta secure the device.
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxScanningOperation( this->lockDeviceConsistency );
+
 	if (folder == m_pathPrefix)
 	{
 		THandle handle;
@@ -342,6 +369,8 @@ CdImageDevice::THandle CdImageDevice::FindFirst(const std::string& folder, vfs::
 
 bool CdImageDevice::FindNext(THandle handle, vfs::FindData* findData)
 {
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxScanningOperation( this->lockDeviceConsistency );
+
 	auto handleData = GetHandle(handle);
 
 	if (handleData)
@@ -366,6 +395,8 @@ bool CdImageDevice::FindNext(THandle handle, vfs::FindData* findData)
 
 void CdImageDevice::FindClose(THandle handle)
 {
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxScanningOperation( this->lockDeviceConsistency );
+
 	auto handleData = GetHandle(handle);
 
 	if (handleData)
@@ -374,6 +405,7 @@ void CdImageDevice::FindClose(THandle handle)
 	}
 }
 
+// only THREAD-SAFE if called from at least SHARED-LOCK.
 void CdImageDevice::FillFindData(vfs::FindData* data, const Entry* entry)
 {
 	data->attributes = 0;
@@ -383,6 +415,8 @@ void CdImageDevice::FillFindData(vfs::FindData* data, const Entry* entry)
 
 void CdImageDevice::SetPathPrefix(const std::string& pathPrefix)
 {
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxConfigChange( this->lockDeviceConsistency );
+
 	m_pathPrefix = pathPrefix;
 }
 }

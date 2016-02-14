@@ -13,38 +13,6 @@ namespace krt
 namespace streaming
 {
 
-template <typename lockType>
-struct shared_lock_acquire
-{
-    inline shared_lock_acquire( lockType& theLock ) : theLock( theLock )
-    {
-        theLock.lock_shared();
-    }
-
-    inline ~shared_lock_acquire( void )
-    {
-        theLock.unlock_shared();
-    }
-
-    lockType& theLock;
-};
-
-template <typename lockType>
-struct exclusive_lock_acquire
-{
-    inline exclusive_lock_acquire( lockType& theLock ) : theLock( theLock )
-    {
-        theLock.lock();
-    }
-
-    inline ~exclusive_lock_acquire( void )
-    {
-        theLock.unlock();
-    }
-
-    lockType& theLock;
-};
-
 void StreamMan::StreamingChannelRuntime( void *ud )
 {
     StreamMan *manager = NULL;
@@ -96,6 +64,8 @@ void StreamMan::StreamingChannelRuntime( void *ud )
 
         // We have to check whether this request makes any sense.
         // Do that in a minimal verification phase.
+        // PLEASE NOTE THAT THIS IS A VERY COMPLICATED POINTER THAT COULD EASILY BREAK
+        // IF YOU DO NOT KNOW WHAT YOU ARE DOING.
         Resource *resToLoad = NULL;
 
         if ( hasRequest )
@@ -133,6 +103,10 @@ void StreamMan::StreamingChannelRuntime( void *ud )
                 {
                     assert( 0 );
                 }
+            }
+            else
+            {
+                assert( 0 );
             }
         }
 
@@ -229,7 +203,7 @@ StreamMan::Channel::Channel( StreamMan *manager )
     params->manager = manager;
     params->channel = this;
 
-    // Semaphore request availability semaphore.
+    // Semaphore for request availability.
     this->semRequestCount = CreateSemaphoreW( NULL, 0, 9000, NULL );
     this->terminationEvent = CreateEventW( NULL, TRUE, FALSE, NULL );
 
@@ -262,7 +236,7 @@ StreamMan::StreamMan( unsigned int numChannels ) : totalStreamingMemoryUsage( 0 
     // Spawn channels for loading.
     for ( unsigned int n = 0; n < numChannels; n++ )
     {
-        this->channels.push_back( std::make_unique<Channel>(this) );
+        this->channels.push_back( new Channel( this ) );
     }
 }
 
@@ -273,6 +247,11 @@ StreamMan::~StreamMan( void )
     // Clear all channels.
     // We just want to do things on the main thread.
     {
+        for ( Channel *channel : this->channels )
+        {
+            delete channel;
+        }
+
         this->channels.clear();
     }
 
@@ -315,7 +294,7 @@ void StreamMan::NativePushStreamingRequest( Channel::request_t request )
 
     // Give this channel the request.
     {
-        Channel *channel = this->channels[ selChannel ].get();
+        Channel *channel = this->channels[ selChannel ];
 
         NativePushChannelRequest( channel, std::move( request ) );
     }
@@ -369,7 +348,7 @@ void StreamMan::LoadingBarrier( void )
     // Wait until all requests have been processed by all channels.
 
     // Check all channels.
-    for ( auto& curChannel : this->channels )
+    for ( Channel *curChannel : this->channels )
     {
         std::unique_lock <std::mutex> lockWaitActive ( curChannel->lockIsActive );
 
@@ -557,6 +536,8 @@ bool StreamMan::UnlinkResourceNative( ident_t resID, bool doLock )
             {
                 Resource *res = &iter->second;
 
+                // Block this resource from transitioning into a loaded state.
+                // This effectively prevents the loader from interefering with our unload-process.
                 res->isAllowedToLoad = false;
 
                 bool doesNeedUnload;
@@ -587,11 +568,18 @@ bool StreamMan::UnlinkResourceNative( ident_t resID, bool doLock )
                     {
                         this->LoadingBarrier();
                     }
-
-                    assert( res->status == eResourceStatus::UNLOADED );
                 }
+
+                // Checking for unloaded status is very important.
+                // If a resource is in the BUFFERING or LOADING state, it is being
+                // managed by a streaming thread, which is very dangerous because
+                // we cannot free the resource memory yet. The unload task above
+                // takes care of such a hazard.
+                assert( res->status == eResourceStatus::UNLOADED );
             }
 
+            // We need to grab this lock because resources could be tried to be accessed
+            // while we are erasing them. Erasing them under locks removes this risk.
             if ( doLock )
             {
                 this->lockResourceContest.lock();
