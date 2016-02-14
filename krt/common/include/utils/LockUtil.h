@@ -1,4 +1,5 @@
 // Lock utilities, like faster locks of RAII wrappers.
+#pragma once
 
 namespace krt
 {
