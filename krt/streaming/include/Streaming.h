@@ -1,5 +1,7 @@
 #pragma once
 
+#include <utils/NestedLList.h>
+
 #include <atomic>
 
 #include <shared_mutex>
@@ -49,7 +51,8 @@ struct StreamMan
         UNLOADED,   // not being managed by anything.
         LOADED,     // available and not being managed explicitly.
         LOADING,    // being managed
-        BUFFERING   // being managed
+        BUFFERING,  // being managed
+        UNLOADING   // being managed
     };
 
     StreamMan( unsigned int numChannels );
@@ -60,6 +63,7 @@ struct StreamMan
     bool Unload( ident_t id );
 
     void LoadingBarrier( void );
+    bool WaitForResource( ident_t id ) const;
 
     eResourceStatus GetResourceStatus( ident_t id ) const;
 
@@ -79,6 +83,8 @@ private:
 
     bool CheckTypeRegionConflict( ident_t base, ident_t range ) const;
 
+    struct Channel;
+
     struct Resource
     {
         inline Resource( void )
@@ -91,12 +97,15 @@ private:
             this->location = right.location;
             this->isAllowedToLoad = right.isAllowedToLoad;
             this->resourceSize = right.resourceSize;
+            this->syncOwner = right.syncOwner;
         }
 
         std::string name;
         std::atomic <eResourceStatus> status;
         ResourceLocation *location;
         bool isAllowedToLoad;
+
+        Channel *syncOwner;
 
         // Meta-data.
         size_t resourceSize;
@@ -170,6 +179,11 @@ private:
                 this->reqType = eRequestType::UNLOAD;
             }
 
+            inline bool operator ==( const request_t& right ) const
+            {
+                return ( this->resID == right.resID && this->reqType == right.reqType );
+            }
+
             ident_t resID;
             eRequestType reqType;
         };
@@ -179,10 +193,13 @@ private:
         std::list <request_t> requests;
 
         std::thread thread;
-        std::shared_timed_mutex channelLock;  // access lock to fields.
+        mutable std::shared_timed_mutex channelLock;  // access lock to fields.
 
-        std::mutex lockIsActive;
-        std::condition_variable condIsActive;
+        mutable std::mutex lockIsActive;
+        mutable std::condition_variable condIsActive;
+
+        mutable std::mutex lockReqProcess;
+        mutable std::condition_variable condReqProcess;
 
         HANDLE semRequestCount;
         HANDLE terminationEvent;
@@ -191,6 +208,63 @@ private:
 
         // FIELDS STARTING FROM HERE ARE PRIVATE TO CHANNEL THREAD.
         std::vector <char> dataBuffer;
+
+        // FIELDS STARTING FROM HERE ARE ONLY WRITE-ABLE BY CHANNEL THREAD.
+        struct Activity
+        {
+            request_t task;
+            NestedListEntry <Activity> node;
+        };
+
+        NestedList <Activity> activities;
+
+        // only THREAD-SAFE if called from EXLUSIVE-LOCK at channelLock
+        inline Activity* AllocateActivity( request_t req )
+        {
+            Activity *task = new Activity;
+
+            task->task = std::move( req );
+            LIST_INSERT( this->activities.root, task->node );
+
+            return task;
+        }
+
+        // only THREAD-SAFE if called from EXCLUSIVE-LOCK at channelLock
+        inline void DeallocateActivity( Activity *task )
+        {
+            LIST_REMOVE( task->node );
+
+            delete task;
+        }
+
+        // METHODS STARTING FROM HERE ARE SAFE FOR CALLING FROM OTHER THREADS.
+        inline bool IsChannelDoing( request_t req ) const
+        {
+            shared_lock_acquire <std::shared_timed_mutex> ctxCheckActivity( this->channelLock );
+
+            LIST_FOREACH_BEGIN( Activity, this->activities.root, node )
+
+                if ( item->task == req )
+                    return true;
+
+            LIST_FOREACH_END
+
+            return false;
+        }
+
+        inline bool IsChannelProcessing( ident_t id ) const
+        {
+            shared_lock_acquire <std::shared_timed_mutex> ctxCheckActivity( this->channelLock );
+
+            LIST_FOREACH_BEGIN( Activity, this->activities.root, node )
+
+                if ( item->task.resID == id )
+                    return true;
+
+            LIST_FOREACH_END
+
+            return false;
+        }
     };
 
     std::vector <Channel*> channels;
@@ -198,7 +272,10 @@ private:
     void NativeProcessStreamingRequest( const Channel::request_t& request, Channel *loadingChannel, Resource *resToLoad );
 
     void NativePushChannelRequest( Channel *channel, Channel::request_t request );
-    void NativePushStreamingRequest( Channel::request_t request );
+    Channel* NativePushStreamingRequest( Channel::request_t request );
+
+    void NativeChannelWaitForCompletion( Channel *channel ) const;
+    bool NativeWaitForResourceActivity( ident_t id ) const;
 
     struct channel_param
     {

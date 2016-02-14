@@ -47,6 +47,7 @@ void StreamMan::StreamingChannelRuntime( void *ud )
         }
 
         // Take a request and fulfill it!
+        Channel::Activity *mainActivity = NULL;
         bool hasRequest = false;
         Channel::request_t request;
         {
@@ -57,6 +58,9 @@ void StreamMan::StreamingChannelRuntime( void *ud )
                 request = channel->requests.front();
 
                 channel->requests.pop_front();
+
+                // We want to let the runtime know that we are doing something.
+                mainActivity = channel->AllocateActivity( request );
 
                 hasRequest = true;
             }
@@ -95,6 +99,9 @@ void StreamMan::StreamingChannelRuntime( void *ud )
                 {
                     if ( wantedResource->status == eResourceStatus::LOADED )
                     {
+                        // New state: unloading!
+                        wantedResource->status = eResourceStatus::UNLOADING;
+
                         // Well, we want to do some stuff with this resource it seems...
                         resToLoad = wantedResource;
                     }
@@ -104,9 +111,12 @@ void StreamMan::StreamingChannelRuntime( void *ud )
                     assert( 0 );
                 }
             }
-            else
+
+            // Each resource can be owned by one sync channel.
+            // The channel is basically a worker thread maintaining resources.
+            if ( resToLoad )
             {
-                assert( 0 );
+                resToLoad->syncOwner = channel;
             }
         }
 
@@ -119,6 +129,17 @@ void StreamMan::StreamingChannelRuntime( void *ud )
         if ( hasRequest )
         {
             exclusive_lock_acquire <std::shared_timed_mutex> ctxChannelConsistency( channel->channelLock );
+
+            // We are not persuing our main goal anymore.
+            channel->DeallocateActivity( mainActivity );
+
+            mainActivity = NULL;
+
+            // The resource is not being maintained anymore.
+            if ( resToLoad )
+            {
+                resToLoad->syncOwner = NULL;
+            }
 
             // We are not active anymore if all requests are fulfilled.
             if ( channel->requests.empty() == true )
@@ -209,6 +230,8 @@ StreamMan::Channel::Channel( StreamMan *manager )
 
     this->isActive = false;
 
+    LIST_CLEAR( this->activities.root );
+
     this->thread = std::thread([=] ()
     {
         StreamingChannelRuntime(params);
@@ -221,6 +244,10 @@ StreamMan::Channel::~Channel( void )
     SetEvent(terminationEvent);
 
     this->thread.join();
+
+    assert( LIST_EMPTY( this->activities.root ) == true );
+
+    assert( this->isActive == false );
 
     // Clean up management stuff.
     CloseHandle( this->semRequestCount );
@@ -286,18 +313,83 @@ void StreamMan::NativePushChannelRequest( Channel *channel, Channel::request_t r
     ReleaseSemaphore( channel->semRequestCount, 1, NULL );
 }
 
-void StreamMan::NativePushStreamingRequest( Channel::request_t request )
+StreamMan::Channel* StreamMan::NativePushStreamingRequest( Channel::request_t request )
 {
     size_t channelCount = this->channels.size();
 
     unsigned int selChannel = ( this->currentChannelID++ % channelCount );
 
     // Give this channel the request.
-    {
-        Channel *channel = this->channels[ selChannel ];
+    Channel *channel = this->channels[ selChannel ];
 
-        NativePushChannelRequest( channel, std::move( request ) );
+    NativePushChannelRequest( channel, std::move( request ) );
+
+    return channel;
+}
+
+void StreamMan::NativeChannelWaitForCompletion( Channel *channel ) const
+{
+    std::unique_lock <std::mutex> lockWaitActive( channel->lockIsActive );
+
+    channel->condIsActive.wait( lockWaitActive,
+        [&]
+    {
+        shared_lock_acquire <std::shared_timed_mutex> ctxChannelConsistency( channel->channelLock );
+
+        return ( ! ( channel->requests.empty() == false || channel->isActive ) );
+    });
+}
+
+bool StreamMan::NativeWaitForResourceActivity( ident_t id ) const
+{
+    // Determine which channel is currently processing this resource (if it even is being processed)
+    // and wait for that channel to complete work.
+
+    Channel *waitForChannel = NULL;
+
+    // Try to get the channel from the queue of any worker thread.
+    {
+        for ( Channel *channel : this->channels )
+        {
+            shared_lock_acquire <std::shared_timed_mutex> ctxCheckChannelQueue( channel->channelLock );
+
+            for ( const Channel::request_t req : channel->requests )
+            {
+                if ( req.resID == id )
+                {
+                    // That channel has some business to do with this resource, so lets wait till it has finished said business.
+                    waitForChannel = channel;
+                }
+            }
+        }
     }
+
+    if ( waitForChannel == NULL )
+    {
+        shared_lock_acquire <std::shared_timed_mutex> ctxCheckResourceWorker( this->lockResourceContest );
+
+        // Attempt to get the worker channel from the resource itself.
+        const Resource *resToCheck = this->GetConstResourceAtID( id );
+
+        eResourceStatus resStatus = resToCheck->status;
+
+        if ( resStatus != eResourceStatus::UNLOADED && resStatus != eResourceStatus::LOADED )
+        {
+            // We want to wait for the channel that works on this to complete things.
+            waitForChannel = resToCheck->syncOwner;
+        }
+    }
+
+    bool didWait = false;
+
+    if ( waitForChannel )
+    {
+        didWait = true;
+
+        NativeChannelWaitForCompletion( waitForChannel );
+    }
+
+    return didWait;
 }
 
 bool StreamMan::Request( ident_t id )
@@ -350,16 +442,13 @@ void StreamMan::LoadingBarrier( void )
     // Check all channels.
     for ( Channel *curChannel : this->channels )
     {
-        std::unique_lock <std::mutex> lockWaitActive ( curChannel->lockIsActive );
-
-        curChannel->condIsActive.wait( lockWaitActive,
-            [&]
-        {
-            shared_lock_acquire <std::shared_timed_mutex> ctxChannelConsistency( curChannel->channelLock );
-
-            return ( ! ( curChannel->requests.empty() == false || curChannel->isActive ) );
-        });
+        NativeChannelWaitForCompletion( curChannel );
     }
+}
+
+bool StreamMan::WaitForResource( ident_t id ) const
+{
+    return NativeWaitForResourceActivity( id );
 }
 
 StreamMan::eResourceStatus StreamMan::GetResourceStatus( ident_t id ) const
@@ -512,6 +601,7 @@ bool StreamMan::LinkResource( ident_t resID, std::string name, ResourceLocation 
     newLink.location = loc;
     newLink.status = eResourceStatus::UNLOADED;
     newLink.isAllowedToLoad = true;
+    newLink.syncOwner = NULL;
 
     newLink.resourceSize = loc->getDataSize();
 
@@ -561,12 +651,12 @@ bool StreamMan::UnlinkResourceNative( ident_t resID, bool doLock )
                     unloadRequest.reqType = Channel::eRequestType::UNLOAD;
                     unloadRequest.resID = resID;
 
-                    NativePushStreamingRequest( std::move( unloadRequest ) );
+                    Channel *reqChannel = NativePushStreamingRequest( std::move( unloadRequest ) );
 
                     // Wait for it to finish unloading.
                     while ( res->status != eResourceStatus::UNLOADED )
                     {
-                        this->LoadingBarrier();
+                        NativeChannelWaitForCompletion( reqChannel );
                     }
                 }
 

@@ -2,6 +2,8 @@
 #include "ProgramArguments.h"
 #include "RTMain.h"
 
+#include "Game.h"
+
 #include <stdio.h>
 
 #include <iostream>
@@ -210,10 +212,6 @@ int Main::Run(const ProgramArguments& arguments)
 				manager.Request(curID);
 			}
 		}
-
-		manager.LoadingBarrier();
-
-		DebugMessage("barrier!");
 	}
 
 	// Check for loaded resource :)
@@ -224,6 +222,19 @@ int Main::Run(const ProgramArguments& arguments)
 
 		assert(stats.memoryInUse != 0);
 	}
+
+    // Wait for some random resource in the middle to be loaded.
+    manager.WaitForResource( 2500 );
+
+    // Lets try unloading things while they are loading!!!
+    resLoadIndex = 0;
+
+    while ( resLoadIndex < numToLoad )
+    {
+        manager.UnlinkResource( resLoadIndex++ );
+    }
+
+    manager.LoadingBarrier();
 
 	unknown();
 	unknown();

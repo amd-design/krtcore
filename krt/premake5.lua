@@ -30,7 +30,8 @@ workspace 'krt'
         includedirs
         {
             'core/include',
-            'streaming/include'
+            'streaming/include',
+            'game/include'
         }
 
         files
@@ -40,7 +41,9 @@ workspace 'krt'
             'core/**.h',
             'core/**.cpp',
             'streaming/**.h',
-            'streaming/**.cpp'
+            'streaming/**.cpp',
+            'game/**.h',
+            'game/**.cpp'
         }
 
         filter 'system:windows'
