@@ -16,12 +16,12 @@ Device::THandle Win32Device::Open(const std::string& fileName, bool readOnly)
 	std::wstring wideName = ToWide(fileName);
 
 	HANDLE hFile = CreateFileW(wideName.c_str(),
-					   (readOnly) ? GENERIC_READ : (GENERIC_READ | GENERIC_WRITE),
-					   FILE_SHARE_READ | FILE_SHARE_WRITE,
-					   nullptr,
-					   OPEN_EXISTING,
-					   FILE_ATTRIBUTE_NORMAL,
-					   nullptr);
+	                           (readOnly) ? GENERIC_READ : (GENERIC_READ | GENERIC_WRITE),
+	                           FILE_SHARE_READ | FILE_SHARE_WRITE,
+	                           nullptr,
+	                           OPEN_EXISTING,
+	                           FILE_ATTRIBUTE_NORMAL,
+	                           nullptr);
 
 	return reinterpret_cast<THandle>(hFile);
 }
@@ -29,15 +29,15 @@ Device::THandle Win32Device::Open(const std::string& fileName, bool readOnly)
 Device::THandle Win32Device::OpenBulk(const std::string& fileName, uint64_t* ptr)
 {
 	std::wstring wideName = ToWide(fileName);
-	*ptr = 0;
+	*ptr                  = 0;
 
 	HANDLE hFile = CreateFileW(wideName.c_str(),
-							   GENERIC_READ,
-							   FILE_SHARE_READ,
-							   nullptr,
-							   OPEN_EXISTING,
-							   FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
-							   nullptr);
+	                           GENERIC_READ,
+	                           FILE_SHARE_READ,
+	                           nullptr,
+	                           OPEN_EXISTING,
+	                           FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
+	                           nullptr);
 
 	return reinterpret_cast<THandle>(hFile);
 }
@@ -47,12 +47,12 @@ Device::THandle Win32Device::Create(const std::string& filename)
 	std::wstring wideName = ToWide(filename);
 
 	HANDLE hFile = CreateFileW(wideName.c_str(),
-							   GENERIC_READ | GENERIC_WRITE,
-							   FILE_SHARE_READ,
-							   nullptr,
-							   CREATE_ALWAYS,
-							   FILE_ATTRIBUTE_NORMAL,
-							   nullptr);
+	                           GENERIC_READ | GENERIC_WRITE,
+	                           FILE_SHARE_READ,
+	                           nullptr,
+	                           CREATE_ALWAYS,
+	                           FILE_ATTRIBUTE_NORMAL,
+	                           nullptr);
 
 	return reinterpret_cast<THandle>(hFile);
 }
@@ -72,18 +72,18 @@ size_t Win32Device::ReadBulk(THandle handle, uint64_t ptr, void* outBuffer, size
 	assert(handle != Device::InvalidHandle);
 
 	OVERLAPPED overlapped = {};
-	overlapped.Offset = (ptr & 0xFFFFFFFF);
+	overlapped.Offset     = (ptr & 0xFFFFFFFF);
 	overlapped.OffsetHigh = ptr >> 32;
-    overlapped.hEvent = CreateEventA( NULL, false, false, NULL );
+	overlapped.hEvent     = CreateEventA(NULL, false, false, NULL);
 
-    // Fuck this optimization shit. You know how kernel objects like files can be unpredictable?
-    // Well, read this:
-    // https://msdn.microsoft.com/en-us/library/windows/desktop/ms683209%28v=vs.85%29.aspx
-    // "If the hEvent member of the OVERLAPPED structure is NULL, the system uses the state of the hFile handle to
-    // signal when the operation has been completed. Use of file, named pipe, or communications-device handles for
-    // this purpose is discouraged. It is safer (...)"
-    // I am pretty sure you can optimize this usage of OVERLAPPED somehow, like making a pool of it with allocated
-    // Event objects. Or do you want to return to synchronous API instead?
+	// Fuck this optimization shit. You know how kernel objects like files can be unpredictable?
+	// Well, read this:
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/ms683209%28v=vs.85%29.aspx
+	// "If the hEvent member of the OVERLAPPED structure is NULL, the system uses the state of the hFile handle to
+	// signal when the operation has been completed. Use of file, named pipe, or communications-device handles for
+	// this purpose is discouraged. It is safer (...)"
+	// I am pretty sure you can optimize this usage of OVERLAPPED somehow, like making a pool of it with allocated
+	// Event objects. Or do you want to return to synchronous API instead?
 
 	BOOL result = ReadFile(reinterpret_cast<HANDLE>(handle), outBuffer, size, nullptr, &overlapped);
 
@@ -101,8 +101,8 @@ size_t Win32Device::ReadBulk(THandle handle, uint64_t ptr, void* outBuffer, size
 		return -1;
 	}
 
-    // Remember to close the event handle!
-    CloseHandle( overlapped.hEvent );
+	// Remember to close the event handle!
+	CloseHandle(overlapped.hEvent);
 
 	return bytesRead;
 }
@@ -165,7 +165,7 @@ bool Win32Device::RemoveFile(const std::string& filename)
 bool Win32Device::RenameFile(const std::string& from, const std::string& to)
 {
 	std::wstring fromName = ToWide(from);
-	std::wstring toName = ToWide(to);
+	std::wstring toName   = ToWide(to);
 
 	return MoveFile(fromName.c_str(), toName.c_str());
 }
@@ -205,8 +205,8 @@ Device::THandle Win32Device::FindFirst(const std::string& folder, FindData* find
 	}
 
 	findData->attributes = winFindData.dwFileAttributes;
-	findData->length = winFindData.nFileSizeLow;
-	findData->name = ToNarrow(winFindData.cFileName);
+	findData->length     = winFindData.nFileSizeLow;
+	findData->name       = ToNarrow(winFindData.cFileName);
 
 	return reinterpret_cast<THandle>(hFind);
 }
@@ -219,11 +219,11 @@ bool Win32Device::FindNext(THandle handle, FindData* findData)
 	if (result)
 	{
 		findData->attributes = winFindData.dwFileAttributes;
-		findData->length = winFindData.nFileSizeLow;
-		findData->name = ToNarrow(winFindData.cFileName);
+		findData->length     = winFindData.nFileSizeLow;
+		findData->name       = ToNarrow(winFindData.cFileName);
 	}
 
-	return result;	
+	return result;
 }
 
 void Win32Device::FindClose(THandle handle)

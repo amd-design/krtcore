@@ -57,7 +57,7 @@ bool Device::RenameFile(const std::string& from, const std::string& to)
 
 size_t Device::GetLength(const std::string& fileName)
 {
-	auto handle = Open(fileName, true);
+	auto handle   = Open(fileName, true);
 	size_t retval = -1;
 
 	if (handle != INVALID_DEVICE_HANDLE)
@@ -73,7 +73,7 @@ size_t Device::GetLength(const std::string& fileName)
 size_t Device::GetLength(THandle handle)
 {
 	size_t curOffset = Seek(handle, 0, SEEK_CUR);
-	size_t retval = Seek(handle, 0, SEEK_END);
+	size_t retval    = Seek(handle, 0, SEEK_END);
 	Seek(handle, curOffset, SEEK_SET);
 
 	return retval;
@@ -81,7 +81,6 @@ size_t Device::GetLength(THandle handle)
 
 void Device::SetPathPrefix(const std::string& pathPrefix)
 {
-
 }
 }
 }

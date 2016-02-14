@@ -10,12 +10,12 @@ namespace streaming
 {
 class CdImageDevice : public vfs::Device
 {
-public:
+  public:
 	CdImageDevice();
 
 	virtual ~CdImageDevice() override;
 
-public:
+  public:
 	bool OpenImage(const std::string& imagePath);
 
 	virtual THandle Open(const std::string& fileName, bool readOnly) override;
@@ -44,7 +44,7 @@ public:
 
 	virtual size_t GetLength(const std::string& fileName) override;
 
-private:
+  private:
 	struct Entry
 	{
 		uint32_t offset;
@@ -59,9 +59,8 @@ private:
 		size_t curOffset;
 
 		inline HandleData()
-			: valid(false)
+		    : valid(false)
 		{
-
 		}
 	};
 
@@ -73,7 +72,7 @@ private:
 		}
 	};
 
-private:
+  private:
 	const Entry* FindEntry(const std::string& path) const;
 
 	HandleData* AllocateHandle(THandle* outHandle);
@@ -82,7 +81,7 @@ private:
 
 	void FillFindData(vfs::FindData* findData, const Entry* entry);
 
-private:
+  private:
 	vfs::DevicePtr m_parentDevice;
 
 	THandle m_parentHandle;
@@ -94,14 +93,14 @@ private:
 	HandleData m_handles[16];
 
 	std::vector<Entry> m_entries;
-    
-    typedef std::map <std::string, Entry*, IgnoreCaseLess> entryLookupMap_t;
+
+	typedef std::map<std::string, Entry*, IgnoreCaseLess> entryLookupMap_t;
 
 	entryLookupMap_t m_entryLookup;
 
-    // I do not know how what your vfs design will really be in the end,
-    // so I use a simple shared access lock by following immutability rules.
-    std::shared_timed_mutex lockDeviceConsistency;
+	// I do not know how what your vfs design will really be in the end,
+	// so I use a simple shared access lock by following immutability rules.
+	std::shared_timed_mutex lockDeviceConsistency;
 };
 }
 }
