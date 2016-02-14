@@ -23,9 +23,8 @@ struct ConsoleExecutionContext
 	std::stringstream errorBuffer;
 
 	inline ConsoleExecutionContext(const ProgramArguments&& arguments)
-		: arguments(arguments)
+	    : arguments(arguments)
 	{
-
 	}
 };
 
@@ -52,9 +51,8 @@ class ConsoleCommandManager
 		THandler function;
 
 		inline Entry(const std::string& name, const THandler& function)
-			: name(name), function(function)
+		    : name(name), function(function)
 		{
-
 		}
 	};
 

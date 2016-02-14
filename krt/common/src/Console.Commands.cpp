@@ -1,26 +1,24 @@
 #include <StdInc.h>
 #include <Console.Commands.h>
 
-#include <utils/LockUtil.h>
 #include <utils/IteratorView.h>
+#include <utils/LockUtil.h>
 
 namespace krt
 {
 ConsoleCommandManager::ConsoleCommandManager()
 {
-
 }
 
 ConsoleCommandManager::~ConsoleCommandManager()
 {
-
 }
 
 void ConsoleCommandManager::Register(const std::string& name, const THandler& handler)
 {
 	auto lock = exclusive_lock_acquire<std::shared_timed_mutex>(m_mutex);
 
-	m_entries.insert({ name, Entry{name, handler} });
+	m_entries.insert({name, Entry{name, handler}});
 }
 
 void ConsoleCommandManager::Invoke(const std::string& commandString)
