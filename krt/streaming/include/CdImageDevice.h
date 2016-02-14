@@ -1,5 +1,6 @@
 #pragma once
 
+#include <utils/IgnoreCaseLess.h>
 #include <vfs/Device.h>
 
 #include <shared_mutex>
@@ -61,14 +62,6 @@ class CdImageDevice : public vfs::Device
 		inline HandleData()
 		    : valid(false)
 		{
-		}
-	};
-
-	struct IgnoreCaseLess
-	{
-		bool operator()(const std::string& left, const std::string& right) const
-		{
-			return (_stricmp(left.c_str(), right.c_str()) < 0);
 		}
 	};
 

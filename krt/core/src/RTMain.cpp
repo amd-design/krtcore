@@ -12,6 +12,8 @@
 #include <Streaming.h>
 #include <vfs/Manager.h>
 
+#include <Console.Commands.h>
+
 namespace krt
 {
 int unknown()
@@ -139,6 +141,19 @@ class CdImageResourceEntry : public streaming::ResourceLocation
 
 int Main::Run(const ProgramArguments& arguments)
 {
+	ConsoleCommand cmd("a", [] (int a, int b, int c)
+	{
+		printf("%d %d %d\n", a, b, c);
+	});
+
+	ConsoleCommand cmd2("a", [] (int a, int b, const std::string& c)
+	{
+		printf("%d %d %s\n", a, b, c.c_str());
+	});
+
+	ConsoleCommandManager::GetInstance()->Invoke("a", ProgramArguments{ "5", "4", "a" });
+	ConsoleCommandManager::GetInstance()->Invoke("a", ProgramArguments{ "5", "4", "1000" });
+
 	std::shared_ptr<streaming::CdImageDevice> cdImage = std::make_shared<streaming::CdImageDevice>();
 
 	// Load the game image to start loading things.

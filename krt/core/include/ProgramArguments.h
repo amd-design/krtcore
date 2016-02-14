@@ -10,6 +10,12 @@ private:
 public:
 	ProgramArguments(int argc, char** argv);
 
+	template<typename... Args>
+	ProgramArguments(Args... args)
+	{
+		m_arguments = std::vector<std::string>{args...};
+	}
+
 	inline const std::string& Get(int i) const
 	{
 		assert(i >= 0 && i < m_arguments.size());
