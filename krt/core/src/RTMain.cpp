@@ -49,7 +49,7 @@ int Main::Run(const ProgramArguments& arguments)
 	ConsoleCommandManager::GetInstance()->Invoke("a", ProgramArguments{ "5", "4", "1000" });
 
     // ))))))))))))))
-    streaming::Test1();
+    streaming::Test2();
 
 	unknown();
 	unknown();

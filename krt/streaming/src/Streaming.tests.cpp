@@ -124,9 +124,9 @@ class CdImageResourceEntry : public streaming::ResourceLocation
 	}
 };
 
-void Test1( void )
+inline std::shared_ptr<streaming::CdImageDevice> GetTestingCdImage( void )
 {
-	std::shared_ptr<streaming::CdImageDevice> cdImage = std::make_shared<streaming::CdImageDevice>();
+    std::shared_ptr<streaming::CdImageDevice> cdImage = std::make_shared<streaming::CdImageDevice>();
 
 	// Load the game image to start loading things.
 	{
@@ -146,47 +146,73 @@ void Test1( void )
 		}
 	}
 
-	// We can only run our beautiful test code if you play along :(
-	assert(cdImage != nullptr);
+    return cdImage;
+}
 
-	vfs::Mount(cdImage, "gta3img:/");
+struct MountAndReadyImage
+{
+    inline MountAndReadyImage( void ) : manager( 4 )
+    {
+        cdImage = GetTestingCdImage();
 
-	streaming::StreamMan manager(4);
+	    // We can only run our beautiful test code if you play along :(
+	    assert(cdImage != nullptr);
+
+	    vfs::Mount(cdImage, "gta3img:/");
+
+	    manager.RegisterResourceType(0, 20000, &dummyInterface);
+
+	    // Link all DFF resources.
+	    streaming::ident_t availID = 0;
+	    {
+		    vfs::FindData findData;
+
+		    streaming::CdImageDevice::THandle findHandle = cdImage->FindFirst("gta3img:/", &findData);
+
+		    if (findHandle != streaming::CdImageDevice::InvalidHandle)
+		    {
+			    // Look through it, meow.
+			    do
+			    {
+				    // Why do I have to do this? :/
+				    std::string realPathName = "gta3img:/" + findData.name;
+
+				    modelResources.push_back(CdImageResourceEntry(cdImage, realPathName));
+
+				    manager.LinkResource(availID++, realPathName, &modelResources.back());
+			    } while (cdImage->FindNext(findHandle, &findData));
+
+			    cdImage->FindClose(findHandle);
+		    }
+	    }
+
+        numResources = availID;
+    }
+
 	TestInterface dummyInterface;
 
-	manager.RegisterResourceType(0, 20000, &dummyInterface);
+    vfs::DevicePtr cdImage;
+    
+    ident_t numResources;
 
-	// Link all DFF resources.
-	streaming::ident_t availID = 0;
+    std::list<CdImageResourceEntry> modelResources;
 
-	std::list<CdImageResourceEntry> modelResources;
-	{
-		vfs::FindData findData;
+	streaming::StreamMan manager;
+};
 
-		streaming::CdImageDevice::THandle findHandle = cdImage->FindFirst("gta3img:/", &findData);
+void Test1( void )
+{
+    MountAndReadyImage imgDesc;
 
-		if (findHandle != streaming::CdImageDevice::InvalidHandle)
-		{
-			// Look through it, meow.
-			do
-			{
-				// Why do I have to do this? :/
-				std::string realPathName = "gta3img:/" + findData.name;
+    StreamMan& manager = imgDesc.manager;
 
-				modelResources.push_back(CdImageResourceEntry(cdImage, realPathName));
-
-				manager.LinkResource(availID++, realPathName, &modelResources.back());
-			} while (cdImage->FindNext(findHandle, &findData));
-
-			cdImage->FindClose(findHandle);
-		}
-	}
+    auto cdImage = imgDesc.cdImage;
 
 	// Request everything in steps of ten!
 	const streaming::ident_t loaderStepCount = 10;
 	streaming::ident_t resLoadIndex          = 0;
 
-	const streaming::ident_t numToLoad = availID;
+	const streaming::ident_t numToLoad = imgDesc.numResources;
 
 	while (resLoadIndex < numToLoad)
 	{
@@ -222,6 +248,92 @@ void Test1( void )
     }
 
     manager.LoadingBarrier();
+}
+
+void Test2( void )
+{
+    MountAndReadyImage imgDesc;
+
+    StreamMan& manager = imgDesc.manager;
+
+    auto cdImage = imgDesc.cdImage;
+
+    // Do some dependency loading.
+    const streaming::ident_t dependSteps = 100;
+    const streaming::ident_t resToLoad = imgDesc.numResources;
+
+    streaming::ident_t iter = 0;
+
+    while ( iter < resToLoad )
+    {
+        // We make a lot of resources depend on some resources.
+        ident_t dependOn = iter++;
+
+        for ( ident_t sub_iter = 0; sub_iter < dependSteps; sub_iter++ )
+        {
+            manager.AddResourceDependency( dependOn, iter++ );
+        }
+
+        iter += ( dependSteps + 1 );
+    }
+
+    // Request a lot of resources :)
+    iter = 0;
+
+    while ( iter < resToLoad )
+    {
+        manager.Request( iter++ );
+    }
+
+    manager.Unload( 1337 );
+
+    manager.LoadingBarrier();
+}
+
+void Test3( void )
+{
+    MountAndReadyImage imgDesc;
+
+    StreamMan& manager = imgDesc.manager;
+
+    auto cdImage = imgDesc.cdImage;
+
+    // Do some dependency loading.
+    const streaming::ident_t dependSteps = 100;
+    const streaming::ident_t resToLoad = imgDesc.numResources;
+
+    streaming::ident_t iter = 0;
+
+    while ( iter < resToLoad )
+    {
+        // We make a lot of resources depend on some resources.
+        ident_t dependOn = iter++;
+
+        for ( ident_t sub_iter = 0; sub_iter < dependSteps; sub_iter++ )
+        {
+            manager.AddResourceDependency( dependOn, iter++ );
+        }
+
+        iter += ( dependSteps + 1 );
+    }
+
+    manager.Request( 0 );
+
+    manager.LoadingBarrier();
+
+    // Try to unload some resources that really should not unload.
+    manager.Unload( 11 );
+    manager.Unload( 23 );
+
+    manager.LoadingBarrier();
+
+    // They have to stay loaded!
+    assert( manager.GetResourceStatus( 11 ) == StreamMan::eResourceStatus::LOADED );
+    assert( manager.GetResourceStatus( 23 ) == StreamMan::eResourceStatus::LOADED );
+
+    // Unlink some stuff I guess.
+    manager.UnlinkResource( 49 );
+    manager.UnlinkResource( 0 );
 }
 
 }

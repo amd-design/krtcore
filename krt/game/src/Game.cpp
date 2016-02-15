@@ -21,7 +21,7 @@ Game::Game( void ) : streaming( GAME_NUM_STREAMING_CHANNELS )
 
     if ( stricmp( computerName, "FALLARBOR" ) == 0 )
     {
-        // Bas's thing.
+        // Bas' thing.
         this->gameDir = L"S:\\Games\\Steam\\steamapps\\common\\Grand Theft Auto 3\\";
     }
     else if ( stricmp( computerName, "DESKTOP" ) == 0 )

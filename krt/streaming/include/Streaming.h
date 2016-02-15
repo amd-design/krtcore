@@ -75,11 +75,12 @@ struct StreamMan
     bool LinkResource( ident_t resID, std::string name, ResourceLocation *loc );
     bool UnlinkResource( ident_t resID );
 
+    bool AddResourceDependency( ident_t resID, ident_t dependsOn );
+    bool RemoveResourceDependency( ident_t resID, ident_t dependsOn );
+
 private:
     // METHODS THAT ARE PRIVATE ARE MEANT TO BE PRIVATE.
     // Be careful exposing anything because this is a threaded structure!
-
-    static void StreamingChannelRuntime( void *ud );
 
     bool CheckTypeRegionConflict( ident_t base, ident_t range ) const;
 
@@ -87,28 +88,95 @@ private:
 
     struct Resource
     {
-        inline Resource( void )
-        {}
-
-        inline Resource( Resource&& right ) : status()
+        inline Resource( ident_t id, std::string name, ResourceLocation *loc )
+            : id( id ), name( std::move( name ) ), status( eResourceStatus::UNLOADED ), refCount( 0 )
         {
-            this->name = std::move( right.name );
+            this->location = loc;
+            this->isAllowedToLoad = true;
+            this->syncOwner = NULL;
+
+            this->resourceSize = loc->getDataSize();
+        }
+
+        inline Resource( Resource&& right ) : id( right.id ), name( std::move( right.name ) ), status(), refCount()
+        {
             this->status = right.status.load();
             this->location = right.location;
             this->isAllowedToLoad = right.isAllowedToLoad;
             this->resourceSize = right.resourceSize;
             this->syncOwner = right.syncOwner;
+            this->depends = std::move( right.depends );
         }
 
-        std::string name;
+        const ident_t id;
+
+        const std::string name;
         std::atomic <eResourceStatus> status;
         ResourceLocation *location;
         bool isAllowedToLoad;
 
         Channel *syncOwner;
 
+        std::vector <Resource*> depends;    // Resource dependencies that have to be loaded before this resource.
+
+        // We also like to keep track of resources that cast a dependency on this Resource.
+        std::vector <Resource*> dependingOn;
+
+        // must be MODIFIED UNDER EXCLUSIVE-ACCESS in lockResourceContest !
+        std::atomic <unsigned int> refCount;
+
         // Meta-data.
         size_t resourceSize;
+
+        // PRIVATE METHODS THAT ARE MEANT TO BE USED VERY CAREFULLY.
+        // must be executed from SHARED-ACCESS from lockResourceAvail at least.
+        // must be executed from SHARED-ACCESS from lockDependsMutate at least.
+        bool DoesDependOn( Resource *res ) const
+        {
+            for ( Resource *dep : this->depends )
+            {
+                if ( dep == res )
+                    return true;
+
+                if ( dep->DoesDependOn( res ) )
+                    return true;
+            }
+
+            return false;
+        }
+
+        // must be executed from SHARED-ACCESS from lockResourceAvail at least.
+        // must be executed from EXCLUSIVE-ACCESS from lockDependsMutate at least.
+        void RemoveDependingOnBackLink( Resource *srcResource )
+        {
+            auto findIter = std::find( this->dependingOn.begin(), this->dependingOn.end(), srcResource );
+
+            if ( findIter != this->dependingOn.end() )
+            {
+                this->dependingOn.erase( findIter );
+            }
+
+            // We actually really want that to be true!
+            assert( findIter != this->dependingOn.end() );
+        }
+
+        // must be executed from SHARED-ACCESS from lockResourceAvail
+        // must be executed from SHARED-ACCESS from lockDependsMutate
+        void CastDependencyLoadRequirement( void )
+        {
+            for ( Resource *dependency : this->depends )
+            {
+                dependency->refCount++;
+            }
+        }
+
+        void UncastDependencyLoadRequirement( void )
+        {
+            for ( Resource *dependency : this->depends )
+            {
+                dependency->refCount--;
+            }
+        }
     };
 
     typedef std::map <ident_t, Resource> resMap_t;
@@ -117,6 +185,12 @@ private:
 
     mutable std::shared_timed_mutex lockResourceContest;
     // this lock has to be taken when the resource system state is changing.
+
+    mutable std::shared_timed_mutex lockDependsMutate;
+    // must lock when dealing with dependencies of resources.
+
+    mutable std::shared_timed_mutex lockResourceAvail;
+    // must lock when adding or removing resources.
 
     inline Resource* GetResourceAtID( ident_t id )
     {
@@ -165,6 +239,8 @@ private:
         Channel( StreamMan *manager );
         ~Channel( void );
 
+        static void StreamingChannelRuntime( void *ud );
+
         enum class eRequestType
         {
             LOAD,
@@ -188,11 +264,16 @@ private:
             eRequestType reqType;
         };
 
+    private:
         StreamMan *manager;
 
+    public:
         std::list <request_t> requests;
 
+    private:
         std::thread thread;
+
+    public:
         mutable std::shared_timed_mutex channelLock;  // access lock to fields.
 
         mutable std::mutex lockIsActive;
@@ -206,6 +287,7 @@ private:
 
         bool isActive;
 
+    private:
         // FIELDS STARTING FROM HERE ARE PRIVATE TO CHANNEL THREAD.
         std::vector <char> dataBuffer;
 
@@ -217,6 +299,21 @@ private:
         };
 
         NestedList <Activity> activities;
+
+    public:
+        // only THREAD-SAFE is called from STREAMING-THREAD.
+        inline void* GetStreamingBuffer( size_t resourceSize )
+        {
+            // Ensure that we have enough space in our loading buffer to store the resource.
+            {
+                if ( this->dataBuffer.size() < resourceSize )
+                {
+                    this->dataBuffer.resize( resourceSize );
+                }
+            }
+
+            return this->dataBuffer.data();
+        }
 
         // only THREAD-SAFE if called from EXLUSIVE-LOCK at channelLock
         inline Activity* AllocateActivity( request_t req )
@@ -252,10 +349,8 @@ private:
             return false;
         }
 
-        inline bool IsChannelProcessing( ident_t id ) const
+        inline bool IsChannelProcessingNoLock( ident_t id ) const
         {
-            shared_lock_acquire <std::shared_timed_mutex> ctxCheckActivity( this->channelLock );
-
             LIST_FOREACH_BEGIN( Activity, this->activities.root, node )
 
                 if ( item->task.resID == id )
@@ -265,16 +360,29 @@ private:
 
             return false;
         }
+
+        inline bool IsChannelProcessing( ident_t id ) const
+        {
+            shared_lock_acquire <std::shared_timed_mutex> ctxCheckActivity( this->channelLock );
+
+            return IsChannelProcessingNoLock( id );
+        }
+
+    private:
+        Resource* AcquireResourceContext( Resource *wantedResource, eRequestType reqType );
+
+        void ProcessResourceRequest( StreamMan *manager, Resource *resToLoad, eRequestType reqType );
     };
 
     std::vector <Channel*> channels;
 
-    void NativeProcessStreamingRequest( const Channel::request_t& request, Channel *loadingChannel, Resource *resToLoad );
+    void NativeProcessStreamingRequest( Channel::eRequestType reqType, Channel *loadingChannel, Resource *resToLoad );
 
     void NativePushChannelRequest( Channel *channel, Channel::request_t request );
     Channel* NativePushStreamingRequest( Channel::request_t request );
 
     void NativeChannelWaitForCompletion( Channel *channel ) const;
+    void NativeChannelWaitForResourceCompletion( Channel *channel, ident_t resID ) const;
     bool NativeWaitForResourceActivity( ident_t id ) const;
 
     struct channel_param
