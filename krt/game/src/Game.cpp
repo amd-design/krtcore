@@ -56,8 +56,6 @@ std::wstring Game::GetGamePath( std::wstring relPath )
     return ( this->gameDir + relPath );
 }
 
-#include <Windows.h>
-
 inline bool is_white_space( char c )
 {
     return ( c == ' ' || c == '\t' );
