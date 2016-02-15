@@ -93,7 +93,22 @@ void StreamMan::Channel::StreamingChannelRuntime( void *ud )
 
         if ( resToLoad )
         {
-            channel->ProcessResourceRequest( manager, resToLoad, reqType );
+            try
+            {
+                channel->ProcessResourceRequest( manager, resToLoad, reqType );
+            }
+            catch( ... )
+            {
+                // Oh no! We experienced a problem while processing one of our resource requests!
+                // How do we let the runtime even know about that? Will it recover?
+                // Welp, we hope that the programmer has been smart enough to think of such a case.
+                // We are just trying to cover our own ass, mostly.
+
+                // Do fault recovery.
+                manager->ResourceFaultRecovery( channel, resToLoad, reqType );
+
+                // Just continue along.
+            }
         }
 
         // Need to clear activity flag.
@@ -229,7 +244,16 @@ void StreamMan::Channel::ProcessResourceRequest( StreamMan *manager, Resource *r
                             // AND the resToLoad object cannot be destroyed while we manage it.
                             manager->lockResourceContest.unlock();
 
-                            manager->NativeChannelWaitForResourceCompletion( conflictingWorker, dependency->id );
+                            try
+                            {
+                                manager->NativeChannelWaitForResourceCompletion( conflictingWorker, dependency->id );
+                            }
+                            catch( ... )
+                            {
+                                manager->lockResourceContest.lock();
+
+                                throw;
+                            }
                                 
                             manager->lockResourceContest.lock();
                         }
@@ -242,56 +266,96 @@ void StreamMan::Channel::ProcessResourceRequest( StreamMan *manager, Resource *r
                             // We just want to load this resource.
                             Resource *dependToBeLoaded = this->AcquireResourceContext( dependency, eRequestType::LOAD );
 
-                            // TODO: add error handling logic.
-                            assert( dependToBeLoaded != NULL );
-
-                            // Register an activity about what we are doing.
-                            Activity *subActivity = NULL;
+                            // If we could not get the context to the dependency, we cannot continue.
+                            if ( dependToBeLoaded == NULL )
                             {
-                                std::unique_lock <std::mutex> ctxIsActiveUpdate( this->lockIsActive );
-
-                                exclusive_lock_acquire <std::shared_timed_mutex> ctxActivityUpdate( this->channelLock );
-
-                                request_t subRequest;
-                                subRequest.reqType = eRequestType::LOAD;
-                                subRequest.resID = dependToBeLoaded->id;
-
-                                subActivity = this->AllocateActivity( std::move( subRequest ) );
+                                throw std::exception( "failed to acquire context for loading resource dependencies" );
                             }
-
-                            manager->lockResourceContest.unlock();
 
                             try
                             {
-                                // Do the loading!
-                                ProcessResourceRequest( manager, dependToBeLoaded, eRequestType::LOAD );
+                                // Register an activity about what we are doing.
+                                Activity *subActivity = NULL;
+                                {
+                                    std::unique_lock <std::mutex> ctxIsActiveUpdate( this->lockIsActive );
+
+                                    exclusive_lock_acquire <std::shared_timed_mutex> ctxActivityUpdate( this->channelLock );
+
+                                    request_t subRequest;
+                                    subRequest.reqType = eRequestType::LOAD;
+                                    subRequest.resID = dependToBeLoaded->id;
+
+                                    subActivity = this->AllocateActivity( std::move( subRequest ) );
+                                }
+
+                                try
+                                {
+                                    manager->lockResourceContest.unlock();
+
+                                    try
+                                    {
+                                        // Do the loading!
+                                        ProcessResourceRequest( manager, dependToBeLoaded, eRequestType::LOAD );
+                                    }
+                                    catch( ... )
+                                    {
+                                        // We seem to have failed explicitly the loading part.
+                                        // This means that we have to readjust the streaming status of our resource.
+                                        manager->ResourceFaultRecovery( this, dependToBeLoaded, eRequestType::LOAD );
+
+                                        manager->lockResourceContest.lock();
+
+                                        throw;
+                                    }
+
+                                    manager->lockResourceContest.lock();
+                                }
+                                catch( ... )
+                                {
+                                    // We need to clean up the activity, because we failed for some reason.
+                                    {
+                                        std::unique_lock <std::mutex> ctxIsActiveUpdate( this->lockIsActive );
+
+                                        exclusive_lock_acquire <std::shared_timed_mutex> ctxActivityUpdate( this->channelLock );
+
+                                        this->DeallocateActivity( subActivity );
+
+                                        // We finished some activity, so notify people.
+                                        this->condIsActive.notify_all();
+                                    }
+
+                                    throw;
+                                }
+
+                                // Unregister the sub activity again.
+                                {
+                                    std::unique_lock <std::mutex> ctxIsActiveUpdate( this->lockIsActive );
+
+                                    exclusive_lock_acquire <std::shared_timed_mutex> ctxActivityUpdate( this->channelLock );
+
+                                    this->DeallocateActivity( subActivity );
+
+                                    // We finished some activity, so notify people.
+                                    this->condIsActive.notify_all();
+                                }
                             }
                             catch( ... )
                             {
-                                manager->lockResourceContest.lock();
+                                // Clean up sync ownership.
+                                {
+                                    assert( dependToBeLoaded->syncOwner == this );
+
+                                    dependToBeLoaded->syncOwner = NULL;
+                                }
 
                                 throw;
                             }
-
-                            manager->lockResourceContest.lock();
 
                             // Not a sync owner anymore.
                             {
                                 assert( dependToBeLoaded->syncOwner == this );
 
                                 dependToBeLoaded->syncOwner = NULL;
-                            }
-
-                            // Unregister the sub activity again.
-                            {
-                                std::unique_lock <std::mutex> ctxIsActiveUpdate( this->lockIsActive );
-
-                                exclusive_lock_acquire <std::shared_timed_mutex> ctxActivityUpdate( this->channelLock );
-
-                                this->DeallocateActivity( subActivity );
-
-                                // We finished some activity, so notify people.
-                                this->condIsActive.notify_all();
                             }
                         }
                         else if ( status == eResourceStatus::LOADED )
@@ -302,6 +366,8 @@ void StreamMan::Channel::ProcessResourceRequest( StreamMan *manager, Resource *r
                         {
                             // No idea what kind of state this is...
                             assert( 0 );
+
+                            throw std::exception( "fatal error: unknown streaming system status" );
                         }
                     }
                 }
@@ -347,6 +413,41 @@ void StreamMan::Channel::ProcessResourceRequest( StreamMan *manager, Resource *r
     // Else KEEP the dependency refCount to force the dependencies to stay loaded.
 }
 
+void StreamMan::ResourceFaultRecovery( Channel *channel, Resource *faultyRes, Channel::eRequestType reqType )
+{
+    // TODO: maybe add feedback about loading errors to the runtime.
+
+    eResourceStatus resStatus = faultyRes->status;
+
+    if ( reqType == Channel::eRequestType::LOAD )
+    {
+        if ( resStatus == eResourceStatus::BUFFERING ||
+             resStatus == eResourceStatus::LOADING )
+        {
+            // We revert the status back to unloaded in both cases.
+            faultyRes->status = eResourceStatus::UNLOADED;
+        }
+    }
+    else if ( reqType == Channel::eRequestType::UNLOAD )
+    {
+        if ( resStatus == eResourceStatus::UNLOADING )
+        {
+            // Well, if we failed to unload then best bet is that we still are loaded???
+            // This is really a bad case, and cannot guarrantee anything at this point :/
+            // We kinda have to terminate this resource, but this is very complicated, so lets just say it unloaded.
+            faultyRes->status = eResourceStatus::UNLOADED;
+
+            // Sanitarily decrease streaming memory.
+            this->totalStreamingMemoryUsage -= faultyRes->resourceSize;
+        }
+    }
+    else
+    {
+        // Should never happen.
+        assert( 0 );
+    }
+}
+
 void StreamMan::NativeProcessStreamingRequest( Channel::eRequestType reqType, Channel *loadingChannel, Resource *resToLoad )
 {
     ident_t resID = resToLoad->id;
@@ -366,6 +467,7 @@ void StreamMan::NativeProcessStreamingRequest( Channel::eRequestType reqType, Ch
 
         if ( reqType == Channel::eRequestType::LOAD )
         {
+            // We could have been called by just the streaming system during termination.
             assert( loadingChannel != NULL );
 
             // Request a private buffer from the channel.
@@ -477,7 +579,20 @@ StreamMan::~StreamMan( void )
 
         if ( resToUnload->status == eResourceStatus::LOADED )
         {
-            NativeProcessStreamingRequest( Channel::eRequestType::UNLOAD, NULL, &loadedRes.second );
+            // Force unloading.
+            resToUnload->status = eResourceStatus::UNLOADING;
+
+            try
+            {
+                NativeProcessStreamingRequest( Channel::eRequestType::UNLOAD, NULL, resToUnload );
+            }
+            catch( ... )
+            {
+                // We do not really care about errors, just reduce streaming memory anyway.
+                this->ResourceFaultRecovery( NULL, resToUnload, Channel::eRequestType::UNLOAD );
+
+                // So lets continue.
+            }
         }
         else
         {
@@ -824,10 +939,16 @@ bool StreamMan::LinkResource( ident_t resID, std::string name, ResourceLocation 
     }
 
     // We want to occupy a Streaming Slot with actual resource data.
+    try
     {
         Resource newLink( resID, std::move( name ), loc );
 
         this->resources.insert( std::pair <ident_t, Resource> ( resID, std::move( newLink ) ) );
+    }
+    catch( ... )
+    {
+        // I guess we will not link any resource.
+        return false;
     }
 
     return true;
@@ -835,7 +956,7 @@ bool StreamMan::LinkResource( ident_t resID, std::string name, ResourceLocation 
 
 bool StreamMan::UnlinkResourceNative( ident_t resID, bool doLock )
 {
-    bool hasUnlinked = false;
+    bool canUnlink = false;
 
     // Find this resource.
     // If we found it, then reset this slot.
@@ -846,41 +967,32 @@ bool StreamMan::UnlinkResourceNative( ident_t resID, bool doLock )
 
         if ( iter != this->resources.end() )
         {
-            // We have to uninstance this resource, if it is instanced.
-            // Do that safely pls.
             Resource *res = &iter->second;
+
+            // Block this resource from transitioning into a loaded state.
+            // This effectively prevents the loader from interfering with our unload-process.
+            res->isAllowedToLoad = false;
+
+            try
             {
-                // Block this resource from transitioning into a loaded state.
-                // This effectively prevents the loader from interfering with our unload-process.
-                res->isAllowedToLoad = false;
-
-                bool doesNeedUnload;
+                // We have to uninstance this resource, if it is instanced.
+                // Do that safely pls.
                 {
-                    if ( doLock )
+                    bool doesNeedUnload = ( res->status != eResourceStatus::UNLOADED );
+
+                    if ( doesNeedUnload )
                     {
-                        this->lockResourceContest.lock_shared();
-                    }
+                        Channel::request_t unloadRequest;
+                        unloadRequest.reqType = Channel::eRequestType::UNLOAD;
+                        unloadRequest.resID = resID;
 
-                    doesNeedUnload = ( res->status != eResourceStatus::UNLOADED );
+                        Channel *reqChannel = NativePushStreamingRequest( std::move( unloadRequest ) );
 
-                    if ( doLock )
-                    {
-                        this->lockResourceContest.unlock_shared();
-                    }
-                }
-
-                if ( doesNeedUnload )
-                {
-                    Channel::request_t unloadRequest;
-                    unloadRequest.reqType = Channel::eRequestType::UNLOAD;
-                    unloadRequest.resID = resID;
-
-                    Channel *reqChannel = NativePushStreamingRequest( std::move( unloadRequest ) );
-
-                    // Wait for it to finish unloading.
-                    while ( res->status != eResourceStatus::UNLOADED )
-                    {
-                        NativeChannelWaitForResourceCompletion( reqChannel, resID );
+                        // Wait for it to finish unloading.
+                        if ( res->status != eResourceStatus::UNLOADED )
+                        {
+                            NativeChannelWaitForResourceCompletion( reqChannel, resID );
+                        }
                     }
                 }
 
@@ -889,31 +1001,49 @@ bool StreamMan::UnlinkResourceNative( ident_t resID, bool doLock )
                 // managed by a streaming thread, which is very dangerous because
                 // we cannot free the resource memory yet. The unload task above
                 // takes care of such a hazard.
-                assert( res->status == eResourceStatus::UNLOADED );
-            }
-
-            // Remove any dependencies from and to this resource.
-            {
-                exclusive_lock_acquire <std::shared_timed_mutex> ctxDependsMutate( this->lockDependsMutate );
-
-                // Remove any back-links from dependencies.
-                for ( Resource *dependency : res->depends )
+                if ( res->status == eResourceStatus::UNLOADED )
                 {
-                    // We are very certain there must be a back-link!
-                    dependency->RemoveDependingOnBackLink( res );
-                }
+                    // Remove any dependencies from and to this resource.
+                    {
+                        exclusive_lock_acquire <std::shared_timed_mutex> ctxDependsMutate( this->lockDependsMutate );
 
-                // Now we are safe to clear our own dependencies. :)
-                res->depends.clear();
+                        // Remove any back-links from dependencies.
+                        for ( Resource *dependency : res->depends )
+                        {
+                            // We are very certain there must be a back-link!
+                            dependency->RemoveDependingOnBackLink( res );
+                        }
+
+                        // Now we are safe to clear our own dependencies. :)
+                        res->depends.clear();
+                    }
+
+                    // From now on, this resource is secure to be "deinitialized".
+                    // Thus we can try to delete it in the next step.
+                    canUnlink = true;
+                }
+            }
+            catch( ... )
+            {
+                // Some exception made us fail our purpose, so restore usual status.
+                res->isAllowedToLoad = true;
+
+                throw;
             }
 
-            // From now on, this resource is secure to be "deinitialized".
-            // Thus we can try to delete it in the next step.
+            if ( !canUnlink )
+            {
+                // We kind of failed our point, so allow loading again.
+                res->isAllowedToLoad = true;
+            }
         }
     }
 
+    bool hasUnlinked = false;
+
     // Delete the resource.
     // Note that another thread could have solved this problem before us.
+    if ( canUnlink )
     {
         exclusive_lock_acquire <std::shared_timed_mutex> ctxResourceUnlink( this->lockResourceAvail );
 

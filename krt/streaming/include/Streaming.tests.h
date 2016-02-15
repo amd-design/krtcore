@@ -12,6 +12,7 @@ namespace streaming
 void Test1( void ); // the first and most amazing test we came up with!!!
 void Test2( void ); // meow-test.
 void Test3( void );
+void FaultTest1( void );
 
 }
 

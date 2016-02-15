@@ -336,6 +336,181 @@ void Test3( void )
     manager.UnlinkResource( 0 );
 }
 
+// Test certain resource locations that fail a certain state, on purpose.
+// We want to be able to fail any stage of the streaming system, because resources can contain errors.
+struct ResLocFailSize : public streaming::ResourceLocation
+{
+    size_t getDataSize( void ) const override
+    {
+        throw std::exception( "nasty bug" );
+    }
+
+    void fetchData( void *dataBuf ) override
+    {
+        // meow.
+    }
+};
+
+struct ResLocFailFetch : public streaming::ResourceLocation
+{
+    size_t getDataSize( void ) const override
+    {
+        return some_text.size();
+    }
+
+    void fetchData( void *dataBuf ) override
+    {
+        throw std::exception( "nasty bug the second" );
+    }
+
+    std::string some_text = "Hello world!";
+};
+
+struct ResLocCoolio : public streaming::ResourceLocation
+{
+    size_t getDataSize( void ) const override
+    {
+        return some_text.size();
+    }
+
+    void fetchData( void *dataBuf ) override
+    {
+        memcpy( dataBuf, some_text.c_str(), some_text.size() );
+    }
+
+    std::string some_text = "Hello world!";
+};
+
+// Some faulty data loaders.
+struct StreamTypeMrFaulty : public streaming::StreamingTypeInterface
+{
+    void LoadResource( ident_t localID, const void *data, size_t dataSize ) override
+    {
+        throw std::exception( "meow this is a bad programming error." );
+    }
+
+    void UnloadResource( ident_t localID ) override
+    {
+        //meow.
+    }
+
+    size_t GetObjectMemorySize( ident_t localID ) const override
+    {
+        return 0;
+    }
+};
+
+struct StreamTypeUnloadFaulty : public streaming::StreamingTypeInterface
+{
+    void LoadResource( ident_t localID, const void *data, size_t dataSize ) override
+    {
+        //meow.
+    }
+
+    void UnloadResource( ident_t localID ) override
+    {
+        throw std::exception( "oh no something horrible happened!" );
+    }
+
+    size_t GetObjectMemorySize( ident_t localID ) const override
+    {
+        return 0;
+    }
+};
+
+// Test made in mind to raise as many errors as possible.
+void FaultTest1( void )
+{
+    auto cdImage = GetTestingCdImage();
+
+	// We can only run our beautiful test code if you play along :(
+	assert(cdImage != nullptr);
+
+	vfs::Mount(cdImage, "gta3img:/");
+
+    StreamMan manager( 1 );
+
+    // Test exception safety.
+    {
+        // getDataSize.
+        {
+            ResLocFailSize resLoc;
+            StreamTypeMrFaulty streamType;
+
+            manager.RegisterResourceType( 0, 1, &streamType );
+
+            manager.LinkResource( 0, "getDataSize-fault", &resLoc );
+
+            manager.Request( 0 );
+            manager.LoadingBarrier();
+
+            manager.UnlinkResource( 0 );
+            manager.UnregisterResourceType( 0 );
+        }
+
+        // fetchData.
+        {
+            ResLocFailFetch resLoc;
+            StreamTypeMrFaulty streamType;
+
+            manager.RegisterResourceType( 0, 1, &streamType );
+
+            manager.LinkResource( 0, "fetchData-fault", &resLoc );
+
+            manager.Request( 0 );
+            manager.LoadingBarrier();
+
+            manager.UnlinkResource( 0 );
+            manager.UnregisterResourceType( 0 );
+        }
+
+        // LoadResource.
+        {
+            ResLocCoolio resLoc;
+            StreamTypeMrFaulty streamType;
+
+            manager.RegisterResourceType( 0, 1, &streamType );
+
+            manager.LinkResource( 0, "LoadResource-fault", &resLoc );
+
+            manager.Request( 0 );
+            manager.LoadingBarrier();
+
+            manager.UnlinkResource( 0 );
+            manager.UnregisterResourceType( 0 );
+        }
+
+        // UnloadResource.
+        {
+            ResLocCoolio resLoc;
+            StreamTypeUnloadFaulty streamType;
+
+            manager.RegisterResourceType( 0, 1, &streamType );
+
+            manager.LinkResource( 0, "UnloadResource-fault", &resLoc );
+
+            manager.Request( 0 );
+            manager.LoadingBarrier();
+
+            manager.UnlinkResource( 0 );
+            manager.UnregisterResourceType( 0 );
+        }
+
+        // UnloadResource with destructor failure.
+        {
+            ResLocCoolio resLoc;
+            StreamTypeUnloadFaulty streamType;
+
+            manager.RegisterResourceType( 0, 1, &streamType );
+
+            manager.LinkResource( 0, "UnloadResource-fault", &resLoc );
+
+            manager.Request( 0 );
+            manager.LoadingBarrier();
+        }
+    }
+}
+
 }
 
 }

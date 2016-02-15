@@ -44,6 +44,7 @@ struct StreamingStats
     size_t maxMemory;
 };
 
+// Streaming system by Martin Turski, meow!
 struct StreamMan
 {
     enum class eResourceStatus
@@ -151,13 +152,13 @@ private:
         {
             auto findIter = std::find( this->dependingOn.begin(), this->dependingOn.end(), srcResource );
 
+            // We actually really want that to be true!
+            assert( findIter != this->dependingOn.end() );
+
             if ( findIter != this->dependingOn.end() )
             {
                 this->dependingOn.erase( findIter );
             }
-
-            // We actually really want that to be true!
-            assert( findIter != this->dependingOn.end() );
         }
 
         // must be executed from SHARED-ACCESS from lockResourceAvail
@@ -375,6 +376,8 @@ private:
     };
 
     std::vector <Channel*> channels;
+
+    void ResourceFaultRecovery( Channel *channel, Resource *faultyRes, Channel::eRequestType reqType );
 
     void NativeProcessStreamingRequest( Channel::eRequestType reqType, Channel *loadingChannel, Resource *resToLoad );
 
