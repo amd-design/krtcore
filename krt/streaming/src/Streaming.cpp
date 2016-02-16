@@ -1016,6 +1016,16 @@ bool StreamMan::UnlinkResourceNative( ident_t resID, bool doLock )
 
                         // Now we are safe to clear our own dependencies. :)
                         res->depends.clear();
+
+                        // Remove and links to this resource.
+                        for ( Resource *requirement : res->dependingOn )
+                        {
+                            auto findIter = std::find( requirement->depends.begin(), requirement->depends.end(), res );
+
+                            assert( findIter != requirement->depends.end() );
+
+                            requirement->depends.erase( findIter );
+                        }
                     }
 
                     // From now on, this resource is secure to be "deinitialized".
@@ -1137,6 +1147,8 @@ bool StreamMan::AddResourceDependency( ident_t resID, ident_t dependsOn )
 
             if ( validLink )
             {
+                assert( std::find( dependency->dependingOn.begin(), dependency->dependingOn.end(), srcResource ) == dependency->dependingOn.end() );
+
                 // Keep track that dependency is being depended on by srcResource.
                 dependency->dependingOn.push_back( srcResource );
 
