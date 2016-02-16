@@ -16,7 +16,7 @@ namespace krt
 
 Game *theGame = NULL;
 
-Game::Game( void ) : streaming( GAME_NUM_STREAMING_CHANNELS ), texManager( streaming ), modelManager( streaming )
+Game::Game( void ) : streaming( GAME_NUM_STREAMING_CHANNELS ), texManager( streaming ), modelManager( streaming, texManager )
 {
     assert( theGame == NULL );
 
@@ -44,16 +44,8 @@ Game::Game( void ) : streaming( GAME_NUM_STREAMING_CHANNELS ), texManager( strea
     }
 
     // Mount the main game archive.
-    {
-        streaming::CdImageDevice *cdImage = new streaming::CdImageDevice();
-
-        cdImage->OpenImage( this->GetGamePath( "MODELS\\GTA3.IMG" ) );
-
-        vfs::DevicePtr mainArchive( cdImage );
-
-        // Mount!
-        vfs::Mount( mainArchive, "gta3" );
-    }
+    this->LoadIMG( "MODELS\\GTA3.IMG" );
+    this->LoadIMG( "MODELS\\GTA_INT.IMG" );
 
     // Load game files!
     this->RunCommandFile( "DATA\\GTA.DAT" );
@@ -141,6 +133,15 @@ void Game::LoadIMG( std::string relPath )
     std::string pathPrefix = ( containerName + ":/" );
 
     vfs::Mount( myDevPtr, pathPrefix );
+
+    // Register our mounted container.
+    {
+        registered_device info;
+        info.pathPrefix = pathPrefix;
+        info.mountedDevice = myDevPtr;
+
+        this->mountedDevices.push_back( info );
+    }
 
     // We now have to parse the contents of the IMG archive. :)
     {
@@ -289,22 +290,29 @@ static inline std::string get_cfg_line( std::istream& in )
 
     std::getline( in, line );
 
-    size_t realStartPos = 0;
+    const char *lineIter = line.c_str();
 
-    size_t pos = 0;
+    const char *lineStartPos = lineIter;
 
-    for ( char c : line )
+    while ( char c = *lineIter )
     {
         if ( !is_white_space( c ) )
         {
-            realStartPos = pos;
+            if ( lineStartPos == NULL )
+            {
+                lineStartPos = lineIter;
+            }
+        }
+
+        if ( c == '\r' )
+        {
             break;
         }
-        
-        pos++;
+
+        lineIter++;
     }
 
-    return line.substr( pos );
+    return std::string( lineStartPos, lineIter );
 }
 
 inline bool ignore_line( const std::string& line )
@@ -331,6 +339,7 @@ void Game::LoadIDEFile( std::string relPath )
     // Gotta process some IDE entries!!
     bool isInSection = false;
     bool isObjectSection = false;
+    bool isTexParentSection = false;
 
     while ( !ideFile.eof() )
     {
@@ -349,12 +358,19 @@ void Game::LoadIDEFile( std::string relPath )
 
                     isInSection = true;
                 }
+                else if ( cfgLine == "txdp" )
+                {
+                    isTexParentSection = true;
+
+                    isInSection = true;
+                }
             }
             else
             {
                 if ( cfgLine == "end" )
                 {
                     isObjectSection = false;
+                    isTexParentSection = false;
 
                     isInSection = false;
                 }
@@ -364,7 +380,7 @@ void Game::LoadIDEFile( std::string relPath )
 
                     if ( isObjectSection )
                     {
-                        if ( args.size() >= 5 )
+                        if ( args.size() == 5 )
                         {
                             // Process this. :)
                             streaming::ident_t id = atoi( args[0].c_str() );
@@ -375,6 +391,21 @@ void Game::LoadIDEFile( std::string relPath )
 
                             // TODO: meow, actually implement this.
                             // need a good resource location idea for this :3
+
+                            modelManager.RegisterResource( id, modelName, txdName, lodDistance, flags, modelName + ".dff" );
+                        }
+                        // TODO: is there any different format with less or more arguments?
+                        // maybe for IPL?
+                    }
+                    else if ( isTexParentSection )
+                    {
+                        if ( args.size() == 2 )
+                        {
+                            const std::string& txdName = args[0].c_str();
+                            const std::string& txdParentName = args[1].c_str();
+
+                            // Register a TXD dependency.
+                            texManager.SetTexParent( txdName, txdParentName );
                         }
                     }
                 }
@@ -428,6 +459,34 @@ void Game::RunCommandFile( std::string relPath )
             Console::ExecuteSingleCommand( cmdLine );
         }
     }
+}
+
+vfs::DevicePtr Game::FindDevice( std::string genPath, std::string& devPathOut )
+{
+    // Search the mounted devices for one that contains our requested item.
+    for ( const registered_device& curDev : this->mountedDevices )
+    {
+        vfs::DevicePtr device = curDev.mountedDevice;
+
+        // Construct a device path.
+        std::string devPath = ( curDev.pathPrefix + genPath );
+
+        uint64_t bulkOffset;
+
+        // We do a test. The first device to open our request wins :)
+        vfs::Device::THandle tryOpenHandle = device->OpenBulk( devPath, &bulkOffset );
+
+        if ( tryOpenHandle != vfs::Device::InvalidHandle )
+        {
+            // OK you won. Lets return you.
+            device->CloseBulk( tryOpenHandle );
+
+            devPathOut = devPath;
+            return vfs::DevicePtr( device );
+        }
+    }
+
+    return nullptr;
 }
 
 };

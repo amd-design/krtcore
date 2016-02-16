@@ -1,10 +1,14 @@
 #include "StdInc.h"
 #include "ModelInfo.h"
 
+#include "vfs\Manager.h"
+
+#include "Game.h"
+
 namespace krt
 {
 
-ModelManager::ModelManager( streaming::StreamMan& streaming ) : streaming( streaming )
+ModelManager::ModelManager( streaming::StreamMan& streaming, TextureManager& texManager ) : streaming( streaming ), texManager( texManager )
 {
     bool didRegister = streaming.RegisterResourceType( MODEL_ID_BASE, MAX_MODELS, this );
 
@@ -23,25 +27,89 @@ ModelManager::~ModelManager( void )
     }
 
     this->models.clear();
-    this->modelMap.clear();
+    this->modelByName.clear();
+    this->modelByID.clear();
 
     streaming.UnregisterResourceType( MODEL_ID_BASE );
 }
 
-void ModelManager::RegisterResource( std::string name, vfs::DevicePtr device, std::string pathToRes )
+void ModelManager::RegisterResource(
+    streaming::ident_t id,
+    std::string name, std::string texDictName, float lodDistance, int flags,
+    std::string relFilePath
+)
 {
-    ModelResource *modelEntry = new ModelResource( device, std::move( pathToRes ) );
+    // Check whether that id is taken already.
+    {
+        ModelResource *alreadyTaken = this->GetModelByID( id );
 
-    streaming::ident_t curID = MODEL_ID_BASE + ( this->models.size() );
+        if ( alreadyTaken )
+        {
+            // Cannot take this id because occupied, meow.
+            return;
+        }
+    }
 
-    modelEntry->id = curID;
+    // Get the device this model is bound to.
+    vfs::DevicePtr resDevice;
+    std::string devPath;
+    {
+        resDevice = theGame->FindDevice( relFilePath, devPath );
+    }
 
-    streaming.LinkResource( curID, name, &modelEntry->vfsResLoc );
+    if ( resDevice == nullptr )
+    {
+        // No device means we do not care.
+        return;
+    }
+
+    ModelResource *modelEntry = new ModelResource( resDevice, std::move( devPath ) );
+
+    modelEntry->id = id;
+    modelEntry->texDictID = -1;
+    modelEntry->lodDistance = lodDistance;
+    modelEntry->flags = flags;
+
+    streaming.LinkResource( id, name, &modelEntry->vfsResLoc );
+
+    // Find the texture dictionary that should link with this model.
+    streaming::ident_t texDictID = -1;
+    {
+        texDictID = texManager.FindTexDict( texDictName );
+
+        if ( texDictID != -1 )
+        {
+            // Try to link it.
+            // If it does not work, then discard this id.
+            bool couldLink = streaming.AddResourceDependency( id, texDictID );
+
+            if ( !couldLink )
+            {
+                texDictID = -1;
+            }
+        }
+    }
+
+    if ( texDictID != -1 )
+    {
+        modelEntry->texDictID = texDictID;
+    }
 
     // Store us. :)
-    this->modelMap.insert( std::make_pair( name, modelEntry ) );
+    this->modelByName.insert( std::make_pair( name, modelEntry ) );
+    this->modelByID.insert( std::make_pair( id, modelEntry ) );
 
     this->models.push_back( modelEntry );
+}
+
+ModelManager::ModelResource* ModelManager::GetModelByID( streaming::ident_t id )
+{
+    auto findIter = this->modelByID.find( id );
+
+    if ( findIter == this->modelByID.end() )
+        return NULL;
+
+    return findIter->second;
 }
 
 void ModelManager::LoadResource( streaming::ident_t localID, const void *dataBuf, size_t memSize )
