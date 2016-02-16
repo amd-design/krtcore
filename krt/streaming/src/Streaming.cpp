@@ -1017,7 +1017,7 @@ bool StreamMan::UnlinkResourceNative( ident_t resID, bool doLock )
                         // Now we are safe to clear our own dependencies. :)
                         res->depends.clear();
 
-                        // Remove and links to this resource.
+                        // Remove any links to this resource.
                         for ( Resource *requirement : res->dependingOn )
                         {
                             auto findIter = std::find( requirement->depends.begin(), requirement->depends.end(), res );

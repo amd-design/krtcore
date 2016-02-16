@@ -37,12 +37,21 @@ void TextureManager::RegisterResource( std::string name, vfs::DevicePtr device, 
     // Create some resource entry.
     TexDictResource *resEntry = new TexDictResource( device, std::move( pathToRes ) );
 
-    streaming::ident_t curID = TXD_START_ID + ( this->texDictList.size() );
+    streaming::ident_t curID = TXD_START_ID + ( (streaming::ident_t)this->texDictList.size() );
 
     resEntry->id = curID;
     resEntry->parentID = -1;
+    resEntry->txdPtr = NULL;
 
-    streaming.LinkResource( curID, name, &resEntry->vfsResLoc );
+    bool couldLink = streaming.LinkResource( curID, name, &resEntry->vfsResLoc );
+
+    if ( !couldLink )
+    {
+        // Dang, something failed. Bail :/
+        delete resEntry;
+
+        return;
+    }
 
     // Store our thing.
     this->texDictMap.insert( std::make_pair( name, resEntry ) );
@@ -121,14 +130,43 @@ void TextureManager::LoadResource( streaming::ident_t localID, const void *dataB
 {
     TexDictResource *texEntry = this->texDictList[ localID ];
 
-    // TODO: hook up with aap's stuff.
+    // Load the TXD resource.
+    rw::TexDictionary *txdRes = NULL;
+    {
+        rw::StreamMemory memoryStream;
+        memoryStream.open( (rw::uint8*)dataBuf, (rw::uint32)memSize );
+
+        bool foundTexDict = rw::findChunk( &memoryStream, rw::ID_TEXDICTIONARY, NULL, NULL );
+
+        if ( !foundTexDict )
+        {
+            throw std::exception( "not a TXD resource" );
+        }
+
+        txdRes = rw::TexDictionary::streamRead( &memoryStream );
+
+        if ( !txdRes )
+        {
+            throw std::exception( "failed to parse texture dictionary file" );
+        }
+    }
+
+    // Store it :)
+    texEntry->txdPtr = txdRes;
 }
 
 void TextureManager::UnloadResource( streaming::ident_t localID )
 {
     TexDictResource *texEntry = this->texDictList[ localID ];
 
-    // TODO: hook up with aap's stuff.
+    // Unload the TXD again.
+    {
+        assert( texEntry->txdPtr != NULL );
+
+        texEntry->txdPtr->destroy();
+    }
+
+    texEntry->txdPtr = NULL;
 }
 
 size_t TextureManager::GetObjectMemorySize( streaming::ident_t localID ) const

@@ -11,6 +11,8 @@
 #include "CdImageDevice.h"
 #include "vfs\Manager.h"
 
+#include <src/rwgta.h>
+
 namespace krt
 {
 
@@ -22,6 +24,12 @@ Game::Game( void ) : streaming( GAME_NUM_STREAMING_CHANNELS ), texManager( strea
 
     // We can only have one game :)
     theGame = this;
+
+    // Initialize RW.
+    rw::platform = rw::PLATFORM_D3D9;
+    rw::loadTextures = false;
+
+    gta::attachPlugins();
 
     // Detect where the game is installed.
     // For now, I guess we do it manually.
@@ -49,6 +57,9 @@ Game::Game( void ) : streaming( GAME_NUM_STREAMING_CHANNELS ), texManager( strea
 
     // Load game files!
     this->RunCommandFile( "DATA\\GTA.DAT" );
+
+    // Do a test that loads all game models.
+    modelManager.LoadAllModels();
 }
 
 Game::~Game( void )

@@ -1,0 +1,5 @@
+Please put important external dependencies here. We do not want to pollute the commit log
+so you should fetch them yourself.
+
+'librw' from https://github.com/aap/librw
+'librwgta' from https://github.com/aap/librwgta

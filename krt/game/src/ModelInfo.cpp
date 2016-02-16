@@ -13,6 +13,8 @@ ModelManager::ModelManager( streaming::StreamMan& streaming, TextureManager& tex
     bool didRegister = streaming.RegisterResourceType( MODEL_ID_BASE, MAX_MODELS, this );
 
     assert( didRegister == true );
+
+    this->models.resize( MAX_MODELS );
 }
 
 ModelManager::~ModelManager( void )
@@ -21,14 +23,16 @@ ModelManager::~ModelManager( void )
 
     for ( ModelResource *model : this->models )
     {
-        streaming.UnlinkResource( model->id );
+        if ( model != NULL )
+        {
+            streaming.UnlinkResource( model->id );
 
-        delete model;
+            delete model;
+        }
     }
 
     this->models.clear();
     this->modelByName.clear();
-    this->modelByID.clear();
 
     streaming.UnregisterResourceType( MODEL_ID_BASE );
 }
@@ -69,8 +73,17 @@ void ModelManager::RegisterResource(
     modelEntry->texDictID = -1;
     modelEntry->lodDistance = lodDistance;
     modelEntry->flags = flags;
+    modelEntry->modelPtr = NULL;
 
-    streaming.LinkResource( id, name, &modelEntry->vfsResLoc );
+    bool couldLink = streaming.LinkResource( id, name, &modelEntry->vfsResLoc );
+
+    if ( !couldLink )
+    {
+        // The resource does not really exist I guess.
+        delete modelEntry;
+
+        return;
+    }
 
     // Find the texture dictionary that should link with this model.
     streaming::ident_t texDictID = -1;
@@ -97,33 +110,80 @@ void ModelManager::RegisterResource(
 
     // Store us. :)
     this->modelByName.insert( std::make_pair( name, modelEntry ) );
-    this->modelByID.insert( std::make_pair( id, modelEntry ) );
 
-    this->models.push_back( modelEntry );
+    this->models[ id - MODEL_ID_BASE ] = modelEntry;
+
+    // Success!
 }
 
 ModelManager::ModelResource* ModelManager::GetModelByID( streaming::ident_t id )
 {
-    auto findIter = this->modelByID.find( id );
-
-    if ( findIter == this->modelByID.end() )
+    if ( id < 0 || id >= MAX_MODELS )
         return NULL;
 
-    return findIter->second;
+    return this->models[ id ];
+}
+
+void ModelManager::LoadAllModels( void )
+{
+    // Request all models and wait for them to load.
+    for ( ModelResource *model : this->models )
+    {
+        if ( model != NULL )
+        {
+            streaming.Request( model->id );
+        }
+    }
+
+    // Wait for things to finish ;)
+    streaming.LoadingBarrier();
 }
 
 void ModelManager::LoadResource( streaming::ident_t localID, const void *dataBuf, size_t memSize )
 {
     ModelResource *modelEntry = this->models[ localID ];
 
-    // TODO: hook up with aap's stuff.
+    assert( modelEntry != NULL );
+
+    // Load the model resource.
+    rw::Clump *newClump = NULL;
+    {
+        rw::StreamMemory memoryStream;
+        memoryStream.open( (rw::uint8*)dataBuf, (rw::uint32)memSize );
+
+        bool foundModel = rw::findChunk( &memoryStream, rw::ID_CLUMP, NULL, NULL );
+
+        if ( !foundModel )
+        {
+            throw std::exception( "not a model resource" );
+        }
+
+        newClump = rw::Clump::streamRead( &memoryStream );
+
+        if ( !newClump )
+        {
+            throw std::exception( "failed to parse model file" );
+        }
+    }
+
+    // Store us. :)
+    modelEntry->modelPtr = newClump;
 }
 
 void ModelManager::UnloadResource( streaming::ident_t localID )
 {
     ModelResource *modelEntry = this->models[ localID ];
 
-    // TODO: hook up with aap's stuff.
+    assert( modelEntry != NULL );
+
+    // Delete GPU data.
+    {
+        assert( modelEntry->modelPtr != NULL );
+
+        modelEntry->modelPtr->destroy();
+    }
+
+    modelEntry->modelPtr = NULL;
 }
 
 size_t ModelManager::GetObjectMemorySize( streaming::ident_t localID ) const

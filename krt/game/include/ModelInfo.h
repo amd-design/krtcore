@@ -38,6 +38,8 @@ struct ModelManager : public streaming::StreamingTypeInterface
         int flags;
 
         DeviceResourceLocation vfsResLoc;
+
+        rw::Clump *modelPtr;
     };
 
     ModelManager( streaming::StreamMan& streaming, TextureManager& texManager );
@@ -51,6 +53,8 @@ struct ModelManager : public streaming::StreamingTypeInterface
 
     ModelResource* GetModelByID( streaming::ident_t id );
 
+    void LoadAllModels( void );
+
     void LoadResource( streaming::ident_t localID, const void *dataBuf, size_t memSize ) override;
     void UnloadResource( streaming::ident_t localID ) override;
 
@@ -63,7 +67,6 @@ private:
     std::vector <ModelResource*> models;
 
     std::map <std::string, ModelResource*> modelByName;
-    std::map <streaming::ident_t, ModelResource*> modelByID;
 };
 
 }

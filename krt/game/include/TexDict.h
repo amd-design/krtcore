@@ -45,7 +45,7 @@ private:
 
         DeviceResourceLocation vfsResLoc;
 
-        // TODO: add pointer to aap's RW object.
+        rw::TexDictionary *txdPtr;
     };
 
     TexDictResource* FindTexDictInternal( const std::string& name ) const;
