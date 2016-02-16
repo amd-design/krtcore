@@ -349,18 +349,21 @@ CdImageDevice::THandle CdImageDevice::FindFirst(const std::string& folder, vfs::
 
 	if (folder == m_pathPrefix)
 	{
-		THandle handle;
-		auto handleData = AllocateHandle(&handle);
+        if ( m_entries.empty() == false )
+        {
+		    THandle handle;
+		    auto handleData = AllocateHandle(&handle);
 
-		if (handleData)
-		{
-			handleData->curOffset = 0;
-			handleData->valid     = true;
+		    if (handleData)
+		    {
+			    handleData->curOffset = 0;
+			    handleData->valid     = true;
 
-			FillFindData(findData, &m_entries[handleData->curOffset]);
+			    FillFindData(findData, &m_entries[handleData->curOffset]);
 
-			return handle;
-		}
+			    return handle;
+		    }
+        }
 	}
 
 	return InvalidHandle;

@@ -5,14 +5,23 @@
 #include <iostream>
 #include <fstream>
 
+#include "Console.h"
+#include "Console.Commands.h"
+
+#include "CdImageDevice.h"
+#include "vfs\Manager.h"
+
 namespace krt
 {
 
 Game *theGame = NULL;
 
-Game::Game( void ) : streaming( GAME_NUM_STREAMING_CHANNELS )
+Game::Game( void ) : streaming( GAME_NUM_STREAMING_CHANNELS ), texManager( streaming ), modelManager( streaming )
 {
     assert( theGame == NULL );
+
+    // We can only have one game :)
+    theGame = this;
 
     // Detect where the game is installed.
     // For now, I guess we do it manually.
@@ -22,23 +31,32 @@ Game::Game( void ) : streaming( GAME_NUM_STREAMING_CHANNELS )
     if ( stricmp( computerName, "FALLARBOR" ) == 0 )
     {
         // Bas' thing.
-        this->gameDir = L"S:\\Games\\Steam\\steamapps\\common\\Grand Theft Auto 3\\";
+        this->gameDir = "S:\\Games\\Steam\\steamapps\\common\\Grand Theft Auto 3\\";
     }
     else if ( stricmp( computerName, "DESKTOP" ) == 0 )
     {
         // Martin's thing.
-        this->gameDir = L"C:\\Program Files (x86)\\Rockstar Games\\GTA San Andreas\\";
+        this->gameDir = "C:\\Program Files (x86)\\Rockstar Games\\GTA San Andreas\\";
     }
     else
     {
         // Add your own, meow.
     }
 
-    // Load game files!
-    this->RunCommandFile( L"DATA\\GTA.DAT" );
+    // Mount the main game archive.
+    {
+        streaming::CdImageDevice *cdImage = new streaming::CdImageDevice();
 
-    // We can only have one game :)
-    theGame = this;
+        cdImage->OpenImage( this->GetGamePath( "MODELS\\GTA3.IMG" ) );
+
+        vfs::DevicePtr mainArchive( cdImage );
+
+        // Mount!
+        vfs::Mount( mainArchive, "gta3" );
+    }
+
+    // Load game files!
+    this->RunCommandFile( "DATA\\GTA.DAT" );
 }
 
 Game::~Game( void )
@@ -49,7 +67,114 @@ Game::~Game( void )
     theGame = NULL;
 }
 
-std::wstring Game::GetGamePath( std::wstring relPath )
+void make_lower( std::string& str )
+{
+    std::transform( str.begin(), str.end(), str.begin(), ::tolower );
+}
+
+inline std::string get_file_name( std::string path, std::string *extOut = NULL )
+{
+    const char *pathIter = path.c_str();
+
+    const char *fileNameStart = pathIter;
+    const char *fileExtEnd = NULL;
+
+    while ( char c = *pathIter )
+    {
+        if ( c == '\\' || c == '/' )
+        {
+            fileNameStart = ( pathIter + 1 );
+        }
+
+        if ( c == '.' )
+        {
+            fileExtEnd = pathIter;
+        }
+
+        pathIter++;
+    }
+
+    if ( fileExtEnd != NULL )
+    {
+        if ( extOut )
+        {
+            *extOut = std::string( fileExtEnd + 1, pathIter );
+        }
+
+        return std::string( fileNameStart, fileExtEnd );
+    }
+
+    if ( extOut )
+    {
+        extOut->clear();
+    }
+
+    return std::string( fileNameStart, pathIter );
+}
+
+void Game::LoadIMG( std::string relPath )
+{
+    // Get the name of the IMG and mount it as it is.
+    std::string containerName = get_file_name( relPath );
+
+    make_lower( containerName );
+
+    streaming::CdImageDevice *imgDevice = new streaming::CdImageDevice();
+
+    if ( imgDevice == NULL )
+    {
+        // We kinda cannot, so bail.
+        return;
+    }
+
+    bool didOpenImage = imgDevice->OpenImage( this->GetGamePath( relPath ) );
+
+    if ( !didOpenImage )
+    {
+        delete imgDevice;
+
+        return;
+    }
+
+    vfs::DevicePtr myDevPtr( imgDevice );
+
+    std::string pathPrefix = ( containerName + ":/" );
+
+    vfs::Mount( myDevPtr, pathPrefix );
+
+    // We now have to parse the contents of the IMG archive. :)
+    {
+        vfs::FindData findData;
+
+        auto findHandle = imgDevice->FindFirst( pathPrefix, &findData );
+
+        if ( findHandle != vfs::Device::InvalidHandle )
+        {
+            do
+            {
+                std::string fileExt;
+
+                std::string fileName = get_file_name( findData.name, &fileExt );
+
+                std::string realDevPath = ( pathPrefix + findData.name );
+
+                // We process things depending on file extension, for now.
+                if ( stricmp( fileExt.c_str(), "TXD" ) == 0 )
+                {
+                    // Register this TXD.
+                    this->GetTextureManager().RegisterResource( fileName, myDevPtr, realDevPath );
+                }
+            }
+            while ( imgDevice->FindNext( findHandle, &findData ) );
+
+            imgDevice->FindClose( findHandle );
+        }
+    }
+
+    // Alright, let's pray for the best!
+}
+
+std::string Game::GetGamePath( std::string relPath )
 {
     // Get some sort of relative directory from the game directory.
     // Note that we want the gameDir to have a slash at the end!
@@ -158,7 +283,7 @@ static inline std::vector <std::string> split_csv_args( std::string line )
     return argsOut;
 }
 
-static inline std::string get_cfg_line( std::fstream& in )
+static inline std::string get_cfg_line( std::istream& in )
 {
     std::string line;
 
@@ -187,16 +312,21 @@ inline bool ignore_line( const std::string& line )
     return ( line.empty() || line.front() == '#' );
 }
 
-void Game::LoadIDEFile( std::wstring relPath )
+// Yea rite, lets just do this.
+inline std::stringstream get_file_stream( std::string relPath )
 {
-    std::wstring dataFilePath = GetGamePath( relPath );
+    std::string dataFilePath = theGame->GetGamePath( relPath );
 
-    std::fstream ideFile( dataFilePath, std::ios::in );
+    vfs::StreamPtr filePtr = vfs::OpenRead( relPath );
 
-    if ( !ideFile.good() )
-    {
-        return;
-    }
+    std::vector <std::uint8_t> fileData = filePtr->ReadToEnd();
+
+    return std::stringstream( std::string( fileData.begin(), fileData.end() ), std::ios::in );
+}
+
+void Game::LoadIDEFile( std::string relPath )
+{
+    std::stringstream ideFile = get_file_stream( GetGamePath( relPath ) );
 
     // Gotta process some IDE entries!!
     bool isInSection = false;
@@ -234,7 +364,18 @@ void Game::LoadIDEFile( std::wstring relPath )
 
                     if ( isObjectSection )
                     {
+                        if ( args.size() >= 5 )
+                        {
+                            // Process this. :)
+                            streaming::ident_t id = atoi( args[0].c_str() );
+                            const std::string& modelName = args[1];
+                            const std::string& txdName = args[2];
+                            float lodDistance = atof( args[3].c_str() );
+                            std::uint32_t flags = atoi( args[4].c_str() );
 
+                            // TODO: meow, actually implement this.
+                            // need a good resource location idea for this :3
+                        }
                     }
                 }
             }
@@ -242,30 +383,35 @@ void Game::LoadIDEFile( std::wstring relPath )
     }
 }
 
-static inline std::wstring ansi_to_wide( std::string str )
+ConsoleCommand ideLoadCmd( "IDE",
+    [] ( const std::string& fileName )
 {
-    return std::wstring( str.begin(), str.end() );
-}
+    theGame->LoadIDEFile( fileName );
+});
 
 // Data file loaders!
-void Game::LoadIPLFile( std::wstring relPath )
+void Game::LoadIPLFile( std::string relPath )
 {
-    std::wstring dataFilePath = GetGamePath( relPath );
+    std::string dataFilePath = GetGamePath( relPath );
 
-
+    
 }
 
-void Game::RunCommandFile( std::wstring relPath )
+ConsoleCommand iplLoadCmd( "IPL",
+    [] ( const std::string& fileName )
 {
-    std::wstring cmdFilePath = GetGamePath( relPath );
+    theGame->LoadIPLFile( fileName );
+});
 
-    std::fstream cmdFile( cmdFilePath, std::ios::in );
+ConsoleCommand imgMountCmd( "IMG",
+    [] ( const std::string& path )
+{
+    theGame->LoadIMG( path );
+});
 
-    if ( cmdFile.good() == false )
-    {
-        // We failed for some reason :(
-        return;
-    }
+void Game::RunCommandFile( std::string relPath )
+{
+    std::stringstream cmdFile = get_file_stream( this->GetGamePath( relPath ) );
 
     // Process commands in lines!
     while ( cmdFile.eof() == false )
@@ -278,28 +424,8 @@ void Game::RunCommandFile( std::wstring relPath )
         // Ignore commented lines.
         if ( !ignore_line( cmdLine ) )
         {
-            // Split it into arguments.
-            std::list <std::string> args = split_cmd_line( cmdLine );
-
-            if ( args.empty() == false )
-            {
-                std::string cmdName = args.front();
-
-                args.pop_front();
-
-                // Execute!
-                //waiting for lovely's command impl!
-
-                if ( cmdName == "IDE" )
-                {
-                    if ( args.size() >= 1 )
-                    {
-                        std::wstring unicodePath = ansi_to_wide( args.front() );
-
-                        LoadIDEFile( unicodePath );
-                    }
-                }
-            }
+            // Execute!
+            Console::ExecuteSingleCommand( cmdLine );
         }
     }
 }

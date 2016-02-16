@@ -3,6 +3,8 @@
 #include "vfs\Manager.h"
 #include "CdImageDevice.h"
 
+#include "Streaming.common.h"
+
 #include <iostream>
 
 namespace krt
@@ -62,68 +64,6 @@ class TestInterface : public streaming::StreamingTypeInterface
 	}
 };
 
-class VfsResourceProvider : public streaming::ResourceLocation
-{
-  private:
-	std::string m_path;
-	vfs::DevicePtr m_device;
-
-	size_t m_length;
-
-  public:
-	VfsResourceProvider(const std::string& path)
-	{
-		m_path   = path;
-		m_device = vfs::GetDevice(path);
-		m_length = m_device->GetLength(m_path);
-	}
-
-	virtual size_t getDataSize(void) const override
-	{
-		return m_length;
-	}
-
-	virtual void fetchData(void* dataBuf) override
-	{
-		uint64_t ptr;
-		auto handle = m_device->OpenBulk(m_path, &ptr);
-		m_device->ReadBulk(handle, ptr, dataBuf, m_length);
-		m_device->CloseBulk(handle);
-	}
-};
-
-class CdImageResourceEntry : public streaming::ResourceLocation
-{
-  private:
-	std::string m_path;
-	vfs::DevicePtr m_device;
-
-	size_t m_length;
-
-  public:
-	CdImageResourceEntry(vfs::DevicePtr device, std::string path)
-	{
-		m_device = device;
-		m_length = device->GetLength(path);
-		m_path   = std::move(path);
-
-		assert(m_length != -1);
-	}
-
-	size_t getDataSize(void) const override
-	{
-		return m_length;
-	}
-
-	void fetchData(void* dataBuf) override
-	{
-		uint64_t ptr;
-		auto handle = m_device->OpenBulk(m_path, &ptr);
-		m_device->ReadBulk(handle, ptr, dataBuf, m_length);
-		m_device->CloseBulk(handle);
-	}
-};
-
 inline std::shared_ptr<streaming::CdImageDevice> GetTestingCdImage( void )
 {
     std::shared_ptr<streaming::CdImageDevice> cdImage = std::make_shared<streaming::CdImageDevice>();
@@ -177,7 +117,7 @@ struct MountAndReadyImage
 				    // Why do I have to do this? :/
 				    std::string realPathName = "gta3img:/" + findData.name;
 
-				    modelResources.push_back(CdImageResourceEntry(cdImage, realPathName));
+				    modelResources.push_back(DeviceResourceLocation(cdImage, realPathName));
 
 				    manager.LinkResource(availID++, realPathName, &modelResources.back());
 			    } while (cdImage->FindNext(findHandle, &findData));
@@ -195,7 +135,7 @@ struct MountAndReadyImage
     
     ident_t numResources;
 
-    std::list<CdImageResourceEntry> modelResources;
+    std::list<DeviceResourceLocation> modelResources;
 
 	streaming::StreamMan manager;
 };
