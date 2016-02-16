@@ -1,0 +1,7 @@
+location: vendor
+sources:
+    - repo: http://tohjo.eu/amd-design/librw.git
+      dir: framework/librw
+
+    - repo: http://tohjo.eu/amd-design/librwgta.git
+      dir: framework/librwgta

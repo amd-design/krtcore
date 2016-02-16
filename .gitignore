@@ -240,3 +240,5 @@ _Pvt_Extensions
 *.vcxproj
 *.vcxproj.filters
 *.sln
+
+vendor/
