@@ -1,4 +1,24 @@
 -- KRT project workspace
+newoption {
+    trigger = "with-librw",
+    value = "path",
+    description = "Path to librw (default ../vendor/framework/librw)"
+}
+
+newoption {
+    trigger = "with-librwgta",
+    value = "path",
+    description = "Path to librwgta (default ../vendor/framework/librwgta)"
+}
+
+if not _OPTIONS['with-librw'] then
+    _OPTIONS['with-librw'] = '../vendor/framework/librw/'
+end
+
+if not _OPTIONS['with-librwgta'] then
+    _OPTIONS['with-librwgta'] = '../vendor/framework/librwgta/'
+end
+
 workspace 'krt'
     configurations { 'Debug', 'Release' }
 
@@ -32,8 +52,8 @@ workspace 'krt'
             'core/include',
             'streaming/include',
             'game/include',
-            'framework/librw',
-            'framework/librwgta'
+            _OPTIONS['with-librw'],
+            _OPTIONS['with-librwgta']
         }
 
         files
@@ -47,7 +67,7 @@ workspace 'krt'
             'game/**.h',
             'game/**.cpp'
         }
-        
+
         links
         {
             'librw',
@@ -64,46 +84,46 @@ workspace 'krt'
         targetname 'librw.%{cfg.buildcfg}'
         language 'C++'
         kind 'StaticLib'
-        
+
         includedirs
         {
-            'framework/librw/src'
+            _OPTIONS['with-librw'] .. 'src'
         }
-        
+
         files
         {
-            'framework/librw/src/**.h',
-            'framework/librw/src/**.cpp',
-            'framework/librw/rw.h'
+            _OPTIONS['with-librw'] .. '/src/**.h',
+            _OPTIONS['with-librw'] .. '/src/**.cpp',
+            _OPTIONS['with-librw'] .. 'rw.h'
         }
-        
+
         undefines
         {
             "NDEBUG"
         }
-        
+
         warnings "Off"
-        
+
     project 'librwgta'
         targetname 'librwgta.%{cfg.buildcfg}'
         language 'C++'
         kind 'StaticLib'
-        
+
         includedirs
         {
-            'framework/librw',
-            'framework/librwgta/src'
+            _OPTIONS['with-librw'],
+            _OPTIONS['with-librwgta'] .. '/src'
         }
-        
+
         files
         {
-            'framework/librwgta/src/**.h',
-            'framework/librwgta/src/**.cpp'
+            _OPTIONS['with-librwgta'] .. '/src/**.h',
+            _OPTIONS['with-librwgta'] .. '/src/**.cpp'
         }
-        
+
         undefines
         {
             "NDEBUG"
         }
-        
+
         warnings "Off"
