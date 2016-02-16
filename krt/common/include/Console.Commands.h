@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <list>
 
@@ -16,6 +17,11 @@
 
 namespace krt
 {
+namespace console
+{
+	class Context;
+}
+
 // console execution context
 struct ConsoleExecutionContext
 {
@@ -34,11 +40,13 @@ class ConsoleCommandManager
 	using THandler = std::function<bool(ConsoleExecutionContext& context)>;
 
   public:
-	ConsoleCommandManager();
+	ConsoleCommandManager(console::Context* context);
 
 	~ConsoleCommandManager();
 
-	void Register(const std::string& name, const THandler& handler);
+	int Register(const std::string& name, const THandler& handler);
+
+	void Unregister(int token);
 
 	void Invoke(const std::string& commandName, const ProgramArguments& arguments);
 
@@ -50,25 +58,25 @@ class ConsoleCommandManager
 		std::string name;
 		THandler function;
 
-		inline Entry(const std::string& name, const THandler& function)
-		    : name(name), function(function)
+		int token;
+
+		inline Entry(const std::string& name, const THandler& function, int token)
+		    : name(name), function(function), token(token)
 		{
 		}
 	};
 
   private:
+	console::Context* m_parentContext;
+
 	std::multimap<std::string, Entry, IgnoreCaseLess> m_entries;
 
 	std::shared_timed_mutex m_mutex;
 
-  public:
-	static inline ConsoleCommandManager* GetInstance()
-	{
-		return ms_instance;
-	}
+	std::atomic<int> m_curToken;
 
-  private:
-	static ConsoleCommandManager* ms_instance;
+  public:
+	static ConsoleCommandManager* GetDefaultInstance();
 };
 
 template <typename TArgument, typename TConstraint = void>
@@ -97,9 +105,27 @@ struct ConsoleArgumentType<TArgument, std::enable_if_t<std::is_integral<TArgumen
 	{
 		try
 		{
-			*out = std::stoi(input);
+			*out = std::stoull(input);
 
 			// no way to know if an integer is valid this lazy way, sadly :(
+			return true;
+		}
+		catch (...)
+		{
+			return false;
+		}
+	}
+};
+
+template <typename TArgument>
+struct ConsoleArgumentType<TArgument, std::enable_if_t<std::is_floating_point<TArgument>::value>>
+{
+	static bool Parse(const std::string& input, TArgument* out)
+	{
+		try
+		{
+			*out = std::stod(input);
+
 			return true;
 		}
 		catch (...)
@@ -173,18 +199,4 @@ struct ConsoleCommandFunction<std::function<void(Args...)>>
 	}
 };
 }
-
-class ConsoleCommand
-{
-  public:
-	template <typename TFunction>
-	ConsoleCommand(const std::string& name, TFunction function)
-	{
-		auto functionRef = detail::make_function(function);
-
-		ConsoleCommandManager::GetInstance()->Register(name, [=](ConsoleExecutionContext& context) {
-			return internal::ConsoleCommandFunction<decltype(functionRef)>::Call(functionRef, context);
-		});
-	}
-};
 }

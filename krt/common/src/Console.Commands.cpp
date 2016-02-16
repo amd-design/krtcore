@@ -1,4 +1,5 @@
 #include <StdInc.h>
+#include <Console.h>
 #include <Console.Commands.h>
 
 #include <utils/IteratorView.h>
@@ -6,7 +7,8 @@
 
 namespace krt
 {
-ConsoleCommandManager::ConsoleCommandManager()
+ConsoleCommandManager::ConsoleCommandManager(console::Context* parentContext)
+	: m_parentContext(parentContext)
 {
 }
 
@@ -14,16 +16,38 @@ ConsoleCommandManager::~ConsoleCommandManager()
 {
 }
 
-void ConsoleCommandManager::Register(const std::string& name, const THandler& handler)
+int ConsoleCommandManager::Register(const std::string& name, const THandler& handler)
 {
 	auto lock = exclusive_lock_acquire<std::shared_timed_mutex>(m_mutex);
 
-	m_entries.insert({name, Entry{name, handler}});
+	int token = m_curToken.fetch_add(1);
+	m_entries.insert({ name, Entry{name, handler, token} });
+
+	return token;
+}
+
+void ConsoleCommandManager::Unregister(int token)
+{
+	auto lock = exclusive_lock_acquire<std::shared_timed_mutex>(m_mutex);
+
+	// look through the list for a matching token
+	for (auto it = m_entries.begin(); it != m_entries.end(); it++)
+	{
+		if (it->second.token == token)
+		{
+			// erase and return immediately (so we won't increment a bad iterator)
+			m_entries.erase(it);
+			return;
+		}
+	}
 }
 
 void ConsoleCommandManager::Invoke(const std::string& commandString)
 {
-	assert(!"Not implemented (needs tokenizer)");
+	ProgramArguments arguments = console::Tokenize(commandString);
+	std::string command = arguments.Shift();
+
+	return Invoke(command, arguments);
 }
 
 void ConsoleCommandManager::Invoke(const std::string& commandName, const ProgramArguments& arguments)
@@ -36,6 +60,14 @@ void ConsoleCommandManager::Invoke(const std::string& commandName, const Program
 
 	if (entryPair.first == entryPair.second)
 	{
+		// try in the fallback context first
+		console::Context* fallbackContext = m_parentContext->GetFallbackContext();
+
+		if (fallbackContext)
+		{
+			return fallbackContext->GetCommandManager()->Invoke(commandName, arguments);
+		}
+
 		// TODO: replace with console stream output
 		printf("No such command %s.\n", commandName.c_str());
 		return;
@@ -64,6 +96,8 @@ void ConsoleCommandManager::Invoke(const std::string& commandName, const Program
 	}
 }
 
-static ConsoleCommandManager g_manager;
-ConsoleCommandManager* ConsoleCommandManager::ms_instance = &g_manager;
+ConsoleCommandManager* ConsoleCommandManager::GetDefaultInstance()
+{
+	return console::GetDefaultContext()->GetCommandManager();
+}
 }

@@ -6,7 +6,7 @@
 #include <fstream>
 
 #include "Console.h"
-#include "Console.Commands.h"
+#include "Console.CommandHelpers.h"
 
 #include "CdImageDevice.h"
 #include "vfs\Manager.h"
@@ -39,7 +39,7 @@ Game::Game( void ) : streaming( GAME_NUM_STREAMING_CHANNELS ), texManager( strea
     if ( stricmp( computerName, "FALLARBOR" ) == 0 )
     {
         // Bas' thing.
-        this->gameDir = "S:\\Games\\Steam\\steamapps\\common\\Grand Theft Auto 3\\";
+        this->gameDir = "S:\\Games\\CleanSA\\GTA San Andreas\\";
     }
     else if ( stricmp( computerName, "DESKTOP" ) == 0 )
     {
@@ -439,37 +439,27 @@ void Game::LoadIPLFile( std::string relPath )
     
 }
 
-ConsoleCommand iplLoadCmd( "IPL",
-    [] ( const std::string& fileName )
-{
-    theGame->LoadIPLFile( fileName );
-});
-
-ConsoleCommand imgMountCmd( "IMG",
-    [] ( const std::string& path )
-{
-    theGame->LoadIMG( path );
-});
-
 void Game::RunCommandFile( std::string relPath )
 {
-    std::stringstream cmdFile = get_file_stream( this->GetGamePath( relPath ) );
+	vfs::StreamPtr stream = vfs::OpenRead(this->GetGamePath(relPath));
+	std::vector<uint8_t> string = stream->ReadToEnd();
 
-    // Process commands in lines!
-    while ( cmdFile.eof() == false )
-    {
-        std::string cmdLine;
-        
-        // Skip whitespace.
-        cmdLine = get_cfg_line( cmdFile );
+	console::Context localConsole;
 
-        // Ignore commented lines.
-        if ( !ignore_line( cmdLine ) )
-        {
-            // Execute!
-            Console::ExecuteSingleCommand( cmdLine );
-        }
-    }
+	ConsoleCommand iplLoadCmd(&localConsole, "IPL",
+							  [] (const std::string& fileName)
+	{
+		theGame->LoadIPLFile(fileName);
+	});
+
+	ConsoleCommand imgMountCmd(&localConsole, "IMG",
+							   [] (const std::string& path)
+	{
+		theGame->LoadIMG(path);
+	});
+
+	localConsole.AddToBuffer(std::string(reinterpret_cast<char*>(string.data()), string.size()));
+	localConsole.ExecuteBuffer();
 }
 
 vfs::DevicePtr Game::FindDevice( std::string genPath, std::string& devPathOut )

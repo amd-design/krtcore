@@ -1,20 +1,57 @@
 #pragma once
 
+#include <Console.Commands.h>
 #include <ProgramArguments.h>
 
 namespace krt
 {
-class Console
+namespace console
+{
+class Context
 {
 public:
-	static void ExecuteSingleCommand(const std::string& command);
+	Context();
 
-	static void ExecuteSingleCommand(const ProgramArguments& arguments);
+	Context(Context* fallbackContext);
 
-	static ProgramArguments Tokenize(const std::string& line);
+	void ExecuteSingleCommand(const std::string& command);
 
-	static void AddToBuffer(const std::string& text);
+	void ExecuteSingleCommand(const ProgramArguments& arguments);
 
-	static void ExecuteBuffer();
+	void AddToBuffer(const std::string& text);
+
+	void ExecuteBuffer();
+
+	inline ConsoleCommandManager* GetCommandManager()
+	{
+		return m_commandManager.get();
+	}
+
+	inline Context* GetFallbackContext()
+	{
+		return m_fallbackContext;
+	}
+
+private:
+	Context* m_fallbackContext;
+
+	std::unique_ptr<ConsoleCommandManager> m_commandManager;
+
+	std::string m_commandBuffer;
+
+	std::mutex m_commandBufferMutex;
 };
+
+Context* GetDefaultContext();
+
+void ExecuteSingleCommand(const std::string& command);
+
+void ExecuteSingleCommand(const ProgramArguments& arguments);
+
+ProgramArguments Tokenize(const std::string& line);
+
+void AddToBuffer(const std::string& text);
+
+void ExecuteBuffer();
+}
 }
