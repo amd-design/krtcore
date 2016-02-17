@@ -15,9 +15,19 @@ namespace krt
 // General model information management container.
 struct ModelManager : public streaming::StreamingTypeInterface
 {
+    enum class eModelType
+    {
+        ATOMIC,
+        VEHICLE,
+        PED
+    };
+
     struct ModelResource
     {
         inline streaming::ident_t GetID( void ) const           { return this->id; }
+        inline eModelType GetType( void ) const                 { return this->modelType; }
+
+        rw::Object* CloneModel( void );
 
     private:
         friend struct ModelManager;
@@ -32,20 +42,24 @@ struct ModelManager : public streaming::StreamingTypeInterface
             return;
         }
 
+        ModelManager *manager;
+
         streaming::ident_t id;
         streaming::ident_t texDictID;
         float lodDistance;
         int flags;
 
+        eModelType modelType;
+
         DeviceResourceLocation vfsResLoc;
 
-        rw::Clump *modelPtr;
+        rw::Object *modelPtr;
     };
 
     ModelManager( streaming::StreamMan& streaming, TextureManager& texManager );
     ~ModelManager( void );
 
-    void RegisterResource(
+    void RegisterAtomicModel(
         streaming::ident_t id,
         std::string name, std::string texDictName, float lodDistance, int flags,
         std::string relFilePath
@@ -67,6 +81,8 @@ private:
     std::vector <ModelResource*> models;
 
     std::map <std::string, ModelResource*> modelByName;
+
+    std::shared_timed_mutex lockModelContext;
 };
 
 }

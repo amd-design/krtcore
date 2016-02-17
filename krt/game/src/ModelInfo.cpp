@@ -37,7 +37,7 @@ ModelManager::~ModelManager( void )
     streaming.UnregisterResourceType( MODEL_ID_BASE );
 }
 
-void ModelManager::RegisterResource(
+void ModelManager::RegisterAtomicModel(
     streaming::ident_t id,
     std::string name, std::string texDictName, float lodDistance, int flags,
     std::string relFilePath
@@ -69,11 +69,14 @@ void ModelManager::RegisterResource(
 
     ModelResource *modelEntry = new ModelResource( resDevice, std::move( devPath ) );
 
+    modelEntry->manager = this;
+
     modelEntry->id = id;
     modelEntry->texDictID = -1;
     modelEntry->lodDistance = lodDistance;
     modelEntry->flags = flags;
     modelEntry->modelPtr = NULL;
+    modelEntry->modelType = eModelType::ATOMIC;
 
     bool couldLink = streaming.LinkResource( id, name, &modelEntry->vfsResLoc );
 
@@ -121,6 +124,8 @@ ModelManager::ModelResource* ModelManager::GetModelByID( streaming::ident_t id )
     if ( id < 0 || id >= MAX_MODELS )
         return NULL;
 
+    shared_lock_acquire <std::shared_timed_mutex> ctxGetModel( this->lockModelContext );
+
     return this->models[ id ];
 }
 
@@ -139,14 +144,59 @@ void ModelManager::LoadAllModels( void )
     streaming.LoadingBarrier();
 }
 
+rw::Object* ModelManager::ModelResource::CloneModel( void )
+{
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxCloneModel( this->manager->lockModelContext );
+
+    rw::Object *modelItem = this->modelPtr;
+
+    if ( modelItem == NULL )
+        return NULL;
+
+    rw::uint8 modelType = modelItem->type;
+
+    if ( modelType == rw::Atomic::ID )
+    {
+        rw::Atomic *atomic = (rw::Atomic*)modelItem;
+
+        return (rw::Object*)atomic->clone();
+    }
+    else if ( modelType == rw::Clump::ID )
+    {
+        rw::Clump *clump = (rw::Clump*)modelItem;
+
+        return (rw::Object*)clump->clone();
+    }
+
+    return NULL;
+}
+
+static rw::Atomic* GetFirstClumpAtomic( rw::Clump *clump )
+{
+    rw::Atomic *firstAtom = NULL;
+
+    rw::clumpForAllAtomics( clump,
+        [&]( rw::Atomic *atom )
+    {
+        if ( !firstAtom )
+        {
+            firstAtom = atom;
+        }
+    });
+
+    return firstAtom;
+}
+
 void ModelManager::LoadResource( streaming::ident_t localID, const void *dataBuf, size_t memSize )
 {
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxLoadModel( this->lockModelContext );
+
     ModelResource *modelEntry = this->models[ localID ];
 
     assert( modelEntry != NULL );
 
     // Load the model resource.
-    rw::Clump *newClump = NULL;
+    rw::Object *modelPtr = NULL;
     {
         rw::StreamMemory memoryStream;
         memoryStream.open( (rw::uint8*)dataBuf, (rw::uint32)memSize );
@@ -158,20 +208,58 @@ void ModelManager::LoadResource( streaming::ident_t localID, const void *dataBuf
             throw std::exception( "not a model resource" );
         }
 
-        newClump = rw::Clump::streamRead( &memoryStream );
+        rw::Clump *newClump = rw::Clump::streamRead( &memoryStream );
 
         if ( !newClump )
         {
             throw std::exception( "failed to parse model file" );
         }
+
+        // Process it so that it is in the model format that we want.
+        eModelType modelType = modelEntry->modelType;
+
+        if ( modelType == eModelType::ATOMIC )
+        {
+            // We just store an atomic.
+            rw::Atomic *firstAtom = GetFirstClumpAtomic( newClump );
+
+            if ( firstAtom )
+            {
+                rw::Atomic *clonedObject = firstAtom->clone();
+
+                if ( clonedObject )
+                {
+                    modelPtr = (rw::Object*)clonedObject;
+                }
+            }
+
+            newClump->destroy();
+        }
+        else if ( modelType == eModelType::VEHICLE ||
+                  modelType == eModelType::PED )
+        {
+            // Just store it as clump.
+            modelPtr = (rw::Object*)newClump;
+        }
+        else
+        {
+            assert( 0 );
+        }
+
+        if ( modelPtr == NULL )
+        {
+            throw std::exception( "invalid model file" );
+        }
     }
 
     // Store us. :)
-    modelEntry->modelPtr = newClump;
+    modelEntry->modelPtr = modelPtr;
 }
 
 void ModelManager::UnloadResource( streaming::ident_t localID )
 {
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxUnloadModel( this->lockModelContext );
+
     ModelResource *modelEntry = this->models[ localID ];
 
     assert( modelEntry != NULL );
@@ -180,7 +268,24 @@ void ModelManager::UnloadResource( streaming::ident_t localID )
     {
         assert( modelEntry->modelPtr != NULL );
 
-        modelEntry->modelPtr->destroy();
+        rw::uint8 modelType = modelEntry->modelPtr->type;
+
+        if ( modelType == rw::Atomic::ID )
+        {
+            rw::Atomic *atomic = (rw::Atomic*)modelEntry->modelPtr;
+
+            atomic->destroy();
+        }
+        else if ( modelType == rw::Clump::ID )
+        {
+            rw::Clump *clump = (rw::Clump*)modelEntry->modelPtr;
+
+            clump->destroy();
+        }
+        else
+        {
+            assert( 0 );
+        }
     }
 
     modelEntry->modelPtr = NULL;

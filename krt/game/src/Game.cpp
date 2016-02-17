@@ -13,6 +13,8 @@
 
 #include <src/rwgta.h>
 
+#pragma warning(disable:4996)
+
 namespace krt
 {
 
@@ -59,7 +61,7 @@ Game::Game( void ) : streaming( GAME_NUM_STREAMING_CHANNELS ), texManager( strea
     this->RunCommandFile( "DATA\\GTA.DAT" );
 
     // Do a test that loads all game models.
-    //modelManager.LoadAllModels();
+    modelManager.LoadAllModels();
 }
 
 Game::~Game( void )
@@ -389,13 +391,13 @@ void Game::LoadIDEFile( std::string relPath )
                             streaming::ident_t id = atoi( args[0].c_str() );
                             const std::string& modelName = args[1];
                             const std::string& txdName = args[2];
-                            float lodDistance = atof( args[3].c_str() );
+                            double lodDistance = atof( args[3].c_str() );
                             std::uint32_t flags = atoi( args[4].c_str() );
 
                             // TODO: meow, actually implement this.
                             // need a good resource location idea for this :3
 
-                            modelManager.RegisterResource( id, modelName, txdName, lodDistance, flags, modelName + ".dff" );
+                            modelManager.RegisterAtomicModel( id, modelName, txdName, (float)lodDistance, flags, modelName + ".dff" );
                         }
                         // TODO: is there any different format with less or more arguments?
                         // maybe for IPL?

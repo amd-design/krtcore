@@ -73,6 +73,8 @@ TextureManager::TexDictResource* TextureManager::FindTexDictInternal( const std:
 
 streaming::ident_t TextureManager::FindTexDict( const std::string& name ) const
 {
+    shared_lock_acquire <std::shared_timed_mutex> ctxFindTXD( this->lockTextureContext );
+
     TexDictResource *texRes = FindTexDictInternal( name );
 
     if ( !texRes )
@@ -85,6 +87,8 @@ streaming::ident_t TextureManager::FindTexDict( const std::string& name ) const
 
 void TextureManager::SetTexParent( const std::string& texName, const std::string& texParentName )
 {
+    shared_lock_acquire <std::shared_timed_mutex> ctxSetParent( this->lockTextureContext );
+
     TexDictResource *texDict = this->FindTexDictInternal( texName );
 
     if ( !texDict )
@@ -128,6 +132,8 @@ void TextureManager::SetTexParent( const std::string& texName, const std::string
 
 void TextureManager::LoadResource( streaming::ident_t localID, const void *dataBuf, size_t memSize )
 {
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxLoadTXD( this->lockTextureContext );
+
     TexDictResource *texEntry = this->texDictList[ localID ];
 
     // Load the TXD resource.
@@ -157,6 +163,8 @@ void TextureManager::LoadResource( streaming::ident_t localID, const void *dataB
 
 void TextureManager::UnloadResource( streaming::ident_t localID )
 {
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxUnloadTXD( this->lockTextureContext );
+
     TexDictResource *texEntry = this->texDictList[ localID ];
 
     // Unload the TXD again.

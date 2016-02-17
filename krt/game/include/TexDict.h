@@ -20,6 +20,9 @@ struct TextureManager : public streaming::StreamingTypeInterface
     streaming::ident_t FindTexDict( const std::string& name ) const;
     void SetTexParent( const std::string& texName, const std::string& texParentName );
 
+    void SetCurrentTXD( streaming::ident_t id );
+    void UnsetCurrentTXD( void );
+
     void LoadResource( streaming::ident_t localID, const void *data, size_t dataSize ) override;
     void UnloadResource( streaming::ident_t localID ) override;
 
@@ -53,6 +56,8 @@ private:
     std::vector <TexDictResource*> texDictList;
 
     std::map <std::string, TexDictResource*> texDictMap;
+
+    mutable std::shared_timed_mutex lockTextureContext;
 };
 
 }

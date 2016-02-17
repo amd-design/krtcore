@@ -6,6 +6,16 @@ namespace krt
 namespace math
 {
 
+inline bool isLinearIndependent( const rw::V3d& one, const rw::V3d& two )
+{
+    rw::Matrix3 testMat;
+    testMat.right = one;
+    testMat.up = two;
+    testMat.at = rw::cross( one, two );
+
+    return ( testMat.determinant() != 0 );
+}
+
 inline bool verifyPlanePointConfiguration(
     const rw::V3d& one, const rw::V3d& two, const rw::V3d& three, const rw::V3d& four
 )
@@ -27,21 +37,16 @@ inline bool verifyPlanePointConfiguration(
         return false;
     }
 
-#if 0
     // verify that we atleast have two dimensions.
     bool hasTwoDimms = false;
     {
-        if ( rw::dot( oneVec, twoVec ) == 0 ||
-             rw::dot( oneVec, threeVec ) == 0 ||
-             rw::dot( twoVec, threeVec ) == 0 )
+        if ( isLinearIndependent( oneVec, twoVec ) ||
+             isLinearIndependent( oneVec, threeVec ) ||
+             isLinearIndependent( twoVec, threeVec ) )
         {
             hasTwoDimms = true;
         }
     }
-#else
-    // Well, I trust the programmer for now.
-    bool hasTwoDimms = true;
-#endif
 
     return hasTwoDimms;
 }
@@ -342,9 +347,9 @@ inline bool intersectSphereWithLine(
 
     double alpha = ( lineDir.x * ( off_lp_sc.x ) + lineDir.y * ( off_lp_sc.y ) + lineDir.z * ( off_lp_sc.z ) ) / lineDirLenSq;
 
-    double beta = ( off_lp_sc.x * off_lp_sc.x + off_lp_sc.y * off_lp_sc.y + off_lp_sc.z * off_lp_sc.z ) / lineDirLenSq;
+    double beta = ( off_lp_sc.x * off_lp_sc.x + off_lp_sc.y * off_lp_sc.y + off_lp_sc.z * off_lp_sc.z );
 
-    double modifier = ( radius * radius / lineDirLenSq - beta + alpha * alpha );
+    double modifier = ( ( radius * radius - beta ) / lineDirLenSq + alpha * alpha );
 
     if ( modifier < 0 )
         return false;
