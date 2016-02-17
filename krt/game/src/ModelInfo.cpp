@@ -55,11 +55,11 @@ void ModelManager::RegisterResource(
     }
 
     // Get the device this model is bound to.
-    vfs::DevicePtr resDevice;
-    std::string devPath;
-    {
-        resDevice = theGame->FindDevice( relFilePath, devPath );
-    }
+    std::string pathPrefix = theGame->GetDevicePathPrefix();
+
+    std::string devPath = ( pathPrefix + relFilePath );
+
+    vfs::DevicePtr resDevice = vfs::GetDevice( devPath );
 
     if ( resDevice == nullptr )
     {

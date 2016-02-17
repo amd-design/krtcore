@@ -59,7 +59,7 @@ Game::Game( void ) : streaming( GAME_NUM_STREAMING_CHANNELS ), texManager( strea
     this->RunCommandFile( "DATA\\GTA.DAT" );
 
     // Do a test that loads all game models.
-    modelManager.LoadAllModels();
+    //modelManager.LoadAllModels();
 }
 
 Game::~Game( void )
@@ -141,18 +141,10 @@ void Game::LoadIMG( std::string relPath )
 
     vfs::DevicePtr myDevPtr( imgDevice );
 
-    std::string pathPrefix = ( containerName + ":/" );
+    // Temporary for now.
+    std::string pathPrefix = this->GetDevicePathPrefix();
 
     vfs::Mount( myDevPtr, pathPrefix );
-
-    // Register our mounted container.
-    {
-        registered_device info;
-        info.pathPrefix = pathPrefix;
-        info.mountedDevice = myDevPtr;
-
-        this->mountedDevices.push_back( info );
-    }
 
     // We now have to parse the contents of the IMG archive. :)
     {
@@ -460,34 +452,6 @@ void Game::RunCommandFile( std::string relPath )
 
 	localConsole.AddToBuffer(std::string(reinterpret_cast<char*>(string.data()), string.size()));
 	localConsole.ExecuteBuffer();
-}
-
-vfs::DevicePtr Game::FindDevice( std::string genPath, std::string& devPathOut )
-{
-    // Search the mounted devices for one that contains our requested item.
-    for ( const registered_device& curDev : this->mountedDevices )
-    {
-        vfs::DevicePtr device = curDev.mountedDevice;
-
-        // Construct a device path.
-        std::string devPath = ( curDev.pathPrefix + genPath );
-
-        uint64_t bulkOffset;
-
-        // We do a test. The first device to open our request wins :)
-        vfs::Device::THandle tryOpenHandle = device->OpenBulk( devPath, &bulkOffset );
-
-        if ( tryOpenHandle != vfs::Device::InvalidHandle )
-        {
-            // OK you won. Lets return you.
-            device->CloseBulk( tryOpenHandle );
-
-            devPathOut = devPath;
-            return vfs::DevicePtr( device );
-        }
-    }
-
-    return nullptr;
 }
 
 };

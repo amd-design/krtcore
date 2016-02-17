@@ -34,7 +34,7 @@ public:
     void LoadIDEFile( std::string relPath );
     void LoadIPLFile( std::string relPath );
 
-    vfs::DevicePtr FindDevice( std::string path, std::string& devPathOut );
+    std::string GetDevicePathPrefix( void )                     { return "gta3:/"; }
 
 private:
     std::string gameDir;
@@ -43,15 +43,6 @@ private:
 
     TextureManager texManager;
     ModelManager modelManager;
-
-    // Need to keep track because there is no generic vfs access system.
-    struct registered_device
-    {
-        std::string pathPrefix;
-        vfs::DevicePtr mountedDevice;
-    };
-    
-    std::vector <registered_device> mountedDevices;
 };
 
 extern Game *theGame;

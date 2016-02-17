@@ -16,6 +16,7 @@
 #include <Console.CommandHelpers.h>
 
 #include <Streaming.tests.h>
+#include <WorldMath.h>
 
 namespace krt
 {
@@ -48,6 +49,7 @@ int Main::Run(const ProgramArguments& arguments)
 	console::ExecuteBuffer();
 
     // ))))))))))))))
+    math::Tests();
     streaming::FaultTest1();
     streaming::Test3();
 
