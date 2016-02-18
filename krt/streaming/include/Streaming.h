@@ -193,6 +193,9 @@ private:
     mutable std::shared_timed_mutex lockResourceAvail;
     // must lock when adding or removing resources.
 
+    mutable std::shared_timed_mutex lockStreamingTypeMutate;
+    // must lock when mutating state of streaming types.
+
     inline Resource* GetResourceAtID( ident_t id )
     {
         resMap_t::iterator foundIter = resources.find( id );

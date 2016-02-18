@@ -2,8 +2,9 @@
 #include "ModelInfo.h"
 
 #include "vfs\Manager.h"
-
 #include "Game.h"
+
+#include "NativePerfLocks.h"
 
 namespace krt
 {
@@ -78,6 +79,8 @@ void ModelManager::RegisterAtomicModel(
     modelEntry->modelPtr = NULL;
     modelEntry->modelType = eModelType::ATOMIC;
 
+    modelEntry->lockModelLoading = SRWLOCK_INIT;
+
     bool couldLink = streaming.LinkResource( id, name, &modelEntry->vfsResLoc );
 
     if ( !couldLink )
@@ -124,8 +127,6 @@ ModelManager::ModelResource* ModelManager::GetModelByID( streaming::ident_t id )
     if ( id < 0 || id >= MAX_MODELS )
         return NULL;
 
-    shared_lock_acquire <std::shared_timed_mutex> ctxGetModel( this->lockModelContext );
-
     return this->models[ id ];
 }
 
@@ -146,12 +147,12 @@ void ModelManager::LoadAllModels( void )
 
 rw::Object* ModelManager::ModelResource::CloneModel( void )
 {
-    exclusive_lock_acquire <std::shared_timed_mutex> ctxCloneModel( this->manager->lockModelContext );
-
     rw::Object *modelItem = this->modelPtr;
 
     if ( modelItem == NULL )
         return NULL;
+
+    NativeSRW_Exclusive ctxCloneModel( this->lockModelLoading );
 
     rw::uint8 modelType = modelItem->type;
 
@@ -169,6 +170,36 @@ rw::Object* ModelManager::ModelResource::CloneModel( void )
     }
 
     return NULL;
+}
+
+void ModelManager::ModelResource::NativeReleaseModel( rw::Object *rwobj )
+{
+    rw::uint8 modelType = rwobj->type;
+
+    if ( modelType == rw::Atomic::ID )
+    {
+        rw::Atomic *atomic = (rw::Atomic*)rwobj;
+
+        atomic->destroy();
+    }
+    else if ( modelType == rw::Clump::ID )
+    {
+        rw::Clump *clump = (rw::Clump*)rwobj;
+
+        clump->destroy();
+    }
+    else
+    {
+        assert( 0 );
+    }
+}
+
+void ModelManager::ModelResource::ReleaseModel( rw::Object *rwobj )
+{
+    // Release the resource under our lock.
+    NativeSRW_Exclusive ctxReleaseModel( this->lockModelLoading );
+
+    NativeReleaseModel( rwobj );
 }
 
 static rw::Atomic* GetFirstClumpAtomic( rw::Clump *clump )
@@ -189,11 +220,11 @@ static rw::Atomic* GetFirstClumpAtomic( rw::Clump *clump )
 
 void ModelManager::LoadResource( streaming::ident_t localID, const void *dataBuf, size_t memSize )
 {
-    exclusive_lock_acquire <std::shared_timed_mutex> ctxLoadModel( this->lockModelContext );
-
     ModelResource *modelEntry = this->models[ localID ];
 
     assert( modelEntry != NULL );
+
+    NativeSRW_Exclusive ctxLoadModel( modelEntry->lockModelLoading );
 
     // Load the model resource.
     rw::Object *modelPtr = NULL;
@@ -208,48 +239,72 @@ void ModelManager::LoadResource( streaming::ident_t localID, const void *dataBuf
             throw std::exception( "not a model resource" );
         }
 
-        rw::Clump *newClump = rw::Clump::streamRead( &memoryStream );
-
-        if ( !newClump )
+        // Set the current TXD.
         {
-            throw std::exception( "failed to parse model file" );
+            streaming::ident_t txdID = modelEntry->texDictID;
+
+            if ( txdID != -1 )
+            {
+                // TODO: this does not work because this thing is a global variable.
+                // It breaks multi-threaded loading, which is a real shame.
+                // Solution: wait till tomorrow so that aap has built in some texture lookup function!
+                texManager.SetCurrentTXD( txdID );
+            }
         }
 
-        // Process it so that it is in the model format that we want.
-        eModelType modelType = modelEntry->modelType;
-
-        if ( modelType == eModelType::ATOMIC )
+        try
         {
-            // We just store an atomic.
-            rw::Atomic *firstAtom = GetFirstClumpAtomic( newClump );
+            rw::Clump *newClump = rw::Clump::streamRead( &memoryStream );
 
-            if ( firstAtom )
+            if ( !newClump )
             {
-                rw::Atomic *clonedObject = firstAtom->clone();
-
-                if ( clonedObject )
-                {
-                    modelPtr = (rw::Object*)clonedObject;
-                }
+                throw std::exception( "failed to parse model file" );
             }
 
-            newClump->destroy();
+            // Process it so that it is in the model format that we want.
+            eModelType modelType = modelEntry->modelType;
+
+            if ( modelType == eModelType::ATOMIC )
+            {
+                // We just store an atomic.
+                rw::Atomic *firstAtom = GetFirstClumpAtomic( newClump );
+
+                if ( firstAtom )
+                {
+                    rw::Atomic *clonedObject = firstAtom->clone();
+
+                    if ( clonedObject )
+                    {
+                        modelPtr = (rw::Object*)clonedObject;
+                    }
+                }
+
+                newClump->destroy();
+            }
+            else if ( modelType == eModelType::VEHICLE ||
+                      modelType == eModelType::PED )
+            {
+                // Just store it as clump.
+                modelPtr = (rw::Object*)newClump;
+            }
+            else
+            {
+                assert( 0 );
+            }
+
+            if ( modelPtr == NULL )
+            {
+                throw std::exception( "invalid model file" );
+            }
         }
-        else if ( modelType == eModelType::VEHICLE ||
-                  modelType == eModelType::PED )
+        catch( ... )
         {
-            // Just store it as clump.
-            modelPtr = (rw::Object*)newClump;
-        }
-        else
-        {
-            assert( 0 );
+            texManager.UnsetCurrentTXD();
+
+            throw;
         }
 
-        if ( modelPtr == NULL )
-        {
-            throw std::exception( "invalid model file" );
-        }
+        texManager.UnsetCurrentTXD();
     }
 
     // Store us. :)
@@ -258,34 +313,19 @@ void ModelManager::LoadResource( streaming::ident_t localID, const void *dataBuf
 
 void ModelManager::UnloadResource( streaming::ident_t localID )
 {
-    exclusive_lock_acquire <std::shared_timed_mutex> ctxUnloadModel( this->lockModelContext );
-
     ModelResource *modelEntry = this->models[ localID ];
 
     assert( modelEntry != NULL );
+
+    NativeSRW_Exclusive ctxUnloadModel( modelEntry->lockModelLoading );
 
     // Delete GPU data.
     {
         assert( modelEntry->modelPtr != NULL );
 
-        rw::uint8 modelType = modelEntry->modelPtr->type;
+        rw::Object *rwobj = modelEntry->modelPtr;
 
-        if ( modelType == rw::Atomic::ID )
-        {
-            rw::Atomic *atomic = (rw::Atomic*)modelEntry->modelPtr;
-
-            atomic->destroy();
-        }
-        else if ( modelType == rw::Clump::ID )
-        {
-            rw::Clump *clump = (rw::Clump*)modelEntry->modelPtr;
-
-            clump->destroy();
-        }
-        else
-        {
-            assert( 0 );
-        }
+        ModelResource::NativeReleaseModel( rwobj );
     }
 
     modelEntry->modelPtr = NULL;

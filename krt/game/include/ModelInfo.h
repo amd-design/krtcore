@@ -21,16 +21,19 @@ struct ModelManager : public streaming::StreamingTypeInterface
         VEHICLE,
         PED
     };
-
+    
     struct ModelResource
     {
         inline streaming::ident_t GetID( void ) const           { return this->id; }
         inline eModelType GetType( void ) const                 { return this->modelType; }
 
         rw::Object* CloneModel( void );
+        void ReleaseModel( rw::Object *rwobj );
 
     private:
         friend struct ModelManager;
+
+        static void NativeReleaseModel( rw::Object *rwobj );
 
         inline ModelResource( vfs::DevicePtr device, std::string pathToRes ) : vfsResLoc( device, pathToRes )
         {
@@ -54,6 +57,8 @@ struct ModelManager : public streaming::StreamingTypeInterface
         DeviceResourceLocation vfsResLoc;
 
         rw::Object *modelPtr;
+
+        SRWLOCK_VIRTUAL lockModelLoading;
     };
 
     ModelManager( streaming::StreamMan& streaming, TextureManager& texManager );
@@ -81,8 +86,6 @@ private:
     std::vector <ModelResource*> models;
 
     std::map <std::string, ModelResource*> modelByName;
-
-    std::shared_timed_mutex lockModelContext;
 };
 
 }

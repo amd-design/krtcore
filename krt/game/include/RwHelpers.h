@@ -27,3 +27,5 @@ inline void clumpForAllCameras( rw::Clump *clump, cbType& cb )
 }
 
 };
+
+typedef void *SRWLOCK_VIRTUAL;

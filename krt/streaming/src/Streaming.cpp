@@ -452,7 +452,7 @@ void StreamMan::NativeProcessStreamingRequest( Channel::eRequestType reqType, Ch
 {
     ident_t resID = resToLoad->id;
 
-    shared_lock_acquire <std::shared_timed_mutex> ctxLoadResource( this->lockResourceContest );
+    shared_lock_acquire <std::shared_timed_mutex> ctxLoadResource( this->lockStreamingTypeMutate );
             
     // Get the resource that we are meant to load.
     reg_streaming_type *typeInfo = this->GetStreamingTypeAtID( resID );
@@ -873,7 +873,7 @@ void StreamMan::ClearResourcesAtSlot( ident_t resID, ident_t range )
 
 bool StreamMan::RegisterResourceType( ident_t base, ident_t range, StreamingTypeInterface *intf )
 {
-    exclusive_lock_acquire <std::shared_timed_mutex> ctxRegisterType( this->lockResourceContest );
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxRegisterType( this->lockStreamingTypeMutate );
 
     // Register an entirely new streaming type, just for your enjoyment!
 
@@ -896,7 +896,7 @@ bool StreamMan::RegisterResourceType( ident_t base, ident_t range, StreamingType
 
 bool StreamMan::UnregisterResourceType( ident_t base )
 {
-    exclusive_lock_acquire <std::shared_timed_mutex> ctxUnregisterType( this->lockResourceContest );
+    exclusive_lock_acquire <std::shared_timed_mutex> ctxUnregisterType( this->lockStreamingTypeMutate );
 
     // We get the streaming type at the given offset and unregister it.
     reg_streaming_type *streamType = GetStreamingTypeAtID( base );

@@ -7,6 +7,8 @@
 
 #include <iostream>
 
+#pragma warning(disable:4996)
+
 namespace krt
 {
 

@@ -31,6 +31,10 @@ struct TextureManager : public streaming::StreamingTypeInterface
 private:
     streaming::StreamMan& streaming;
 
+    static rw::Texture* _rwFindTextureCallback( const char *name );
+
+    rw::Texture* (*_tmpStoreOldCB)( const char *name );
+
     struct TexDictResource
     {
         TexDictResource( vfs::DevicePtr device, std::string pathToRes ) : vfsResLoc( device, pathToRes )
@@ -49,15 +53,56 @@ private:
         DeviceResourceLocation vfsResLoc;
 
         rw::TexDictionary *txdPtr;
+
+        SRWLOCK_VIRTUAL lockResourceLoad;
     };
+
+    struct ThreadLocal_CurrentTXDEnv
+    {
+        inline ThreadLocal_CurrentTXDEnv( TextureManager *manager )
+        {
+            exclusive_lock_acquire <std::shared_timed_mutex> ctxAddTXDEnv( manager->lockTXDEnvList );
+
+            LIST_INSERT( manager->_tlCurrentTXDEnvList.root, node );
+
+            this->isRegistered = true;
+            this->manager = manager;
+        }
+
+        inline ~ThreadLocal_CurrentTXDEnv( void )
+        {
+            if ( manager != NULL )
+            {
+                exclusive_lock_acquire <std::shared_timed_mutex> ctxRemoveTXDEnv( manager->lockTXDEnvList );
+
+                if ( this->isRegistered )
+                {
+                    LIST_REMOVE( node );
+
+                    this->isRegistered = false;
+                }
+            }
+        }
+
+        rw::TexDictionary *currentTXD;
+
+        bool isRegistered;
+        NestedListEntry <ThreadLocal_CurrentTXDEnv> node;
+
+        TextureManager *manager;
+    };
+
+    NestedList <ThreadLocal_CurrentTXDEnv> _tlCurrentTXDEnvList;
+
+    mutable std::shared_timed_mutex lockTXDEnvList;
+
+    ThreadLocal_CurrentTXDEnv* GetCurrentTXDEnv( void );
 
     TexDictResource* FindTexDictInternal( const std::string& name ) const;
 
     std::vector <TexDictResource*> texDictList;
 
     std::map <std::string, TexDictResource*> texDictMap;
-
-    mutable std::shared_timed_mutex lockTextureContext;
 };
 
 }

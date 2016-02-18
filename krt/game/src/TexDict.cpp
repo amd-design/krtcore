@@ -2,18 +2,49 @@
 #include "TexDict.h"
 #include "Game.h"
 
+#include "NativePerfLocks.h"
+
 namespace krt
 {
 
 TextureManager::TextureManager( streaming::StreamMan& streaming ) : streaming( streaming )
 {
+    // WARNING: there can only be ONE texture manager!
+    // This is because of TLS things, and because we dont have a sophisticated enough treading library that can abstract problems away.
+
     bool success = streaming.RegisterResourceType( TXD_START_ID, MAX_TXD, this );
 
     assert( success == true );
+
+    // We register our texture find callback and use it solely from here on.
+    this->_tmpStoreOldCB = rw::Texture::findCB;
+
+    rw::Texture::findCB = _rwFindTextureCallback;
+
+    LIST_CLEAR( this->_tlCurrentTXDEnvList.root );
 }
 
 TextureManager::~TextureManager( void )
 {
+    // Unregister all current TXD environments.
+    {
+        exclusive_lock_acquire <std::shared_timed_mutex> ctxUnregisterTXDEnvs( this->lockTXDEnvList );
+
+        while ( !LIST_EMPTY( this->_tlCurrentTXDEnvList.root ) )
+        {
+            ThreadLocal_CurrentTXDEnv *env = LIST_GETITEM(ThreadLocal_CurrentTXDEnv, this->_tlCurrentTXDEnvList.root.next, node);
+
+            LIST_REMOVE( env->node );
+
+            env->isRegistered = false;
+
+            env->manager = NULL;
+        }
+    }
+
+    // Unregister our find CB.
+    rw::Texture::findCB = this->_tmpStoreOldCB;
+
     // We expect that things cannot stream anymore at this point.
 
     // Delete all resource things.
@@ -43,7 +74,13 @@ void TextureManager::RegisterResource( std::string name, vfs::DevicePtr device, 
     resEntry->parentID = -1;
     resEntry->txdPtr = NULL;
 
+    resEntry->lockResourceLoad = SRWLOCK_INIT;
+
     bool couldLink = streaming.LinkResource( curID, name, &resEntry->vfsResLoc );
+
+    // German radio is really really low quality with songs that are sung by wanna-be musicians.
+    // I heavily dislike those new sarcastic songs. It is one reason why I dislike the German society aswell.
+    // Not to say that the German society is honor based, which makes it good again.
 
     if ( !couldLink )
     {
@@ -57,6 +94,39 @@ void TextureManager::RegisterResource( std::string name, vfs::DevicePtr device, 
     this->texDictMap.insert( std::make_pair( name, resEntry ) );
 
     this->texDictList.push_back( resEntry );
+}
+
+TextureManager::ThreadLocal_CurrentTXDEnv* TextureManager::GetCurrentTXDEnv( void )
+{
+    static thread_local ThreadLocal_CurrentTXDEnv txdEnv( this );
+
+    return &txdEnv;
+}
+
+rw::Texture* TextureManager::_rwFindTextureCallback( const char *name )
+{
+    Game *theGame = krt::theGame;
+
+    if ( theGame )
+    {
+        TextureManager& texManager = theGame->GetTextureManager();
+
+        ThreadLocal_CurrentTXDEnv *txdEnv = texManager.GetCurrentTXDEnv();
+
+        if ( txdEnv )
+        {
+            // TODO: add parsing of parent TXD archives.
+
+            rw::TexDictionary *currentTXD = txdEnv->currentTXD;
+
+            if ( currentTXD )
+            {
+                return currentTXD->find( name );
+            }
+        }
+    }
+
+    return NULL;
 }
 
 TextureManager::TexDictResource* TextureManager::FindTexDictInternal( const std::string& name ) const
@@ -73,8 +143,6 @@ TextureManager::TexDictResource* TextureManager::FindTexDictInternal( const std:
 
 streaming::ident_t TextureManager::FindTexDict( const std::string& name ) const
 {
-    shared_lock_acquire <std::shared_timed_mutex> ctxFindTXD( this->lockTextureContext );
-
     TexDictResource *texRes = FindTexDictInternal( name );
 
     if ( !texRes )
@@ -87,17 +155,19 @@ streaming::ident_t TextureManager::FindTexDict( const std::string& name ) const
 
 void TextureManager::SetTexParent( const std::string& texName, const std::string& texParentName )
 {
-    shared_lock_acquire <std::shared_timed_mutex> ctxSetParent( this->lockTextureContext );
-
     TexDictResource *texDict = this->FindTexDictInternal( texName );
 
     if ( !texDict )
         return;
 
+    NativeSRW_Exclusive ctxSetParent( texDict->lockResourceLoad );
+
     TexDictResource *texParentDict = this->FindTexDictInternal( texParentName );
 
     if ( !texParentDict )
         return;
+
+    NativeSRW_Shared ctxIsParent( texParentDict->lockResourceLoad );
 
     // Remove any previous link.
     streaming::ident_t mainID = texDict->id;
@@ -130,11 +200,50 @@ void TextureManager::SetTexParent( const std::string& texName, const std::string
     return;
 }
 
+void TextureManager::SetCurrentTXD( streaming::ident_t id )
+{
+    if ( id < TXD_START_ID || id >= TXD_START_ID + this->texDictList.size() )
+        return;
+
+    id -= TXD_START_ID;
+
+    TexDictResource *texDict = this->texDictList[ id ];
+
+    if ( texDict == NULL )
+        return;
+
+    NativeSRW_Shared ctxSetCurrentTXD( texDict->lockResourceLoad );
+
+    // Set it as current TXD.
+    {
+        rw::TexDictionary *txdPtr = texDict->txdPtr;
+
+        if ( txdPtr )
+        {
+            ThreadLocal_CurrentTXDEnv *txdEnv = this->GetCurrentTXDEnv();
+
+            txdEnv->currentTXD = txdPtr;
+        }
+    }
+}
+
+void TextureManager::UnsetCurrentTXD( void )
+{
+    ThreadLocal_CurrentTXDEnv *txdEnv = this->GetCurrentTXDEnv();
+
+    if ( txdEnv )
+    {
+        txdEnv->currentTXD = NULL;
+    }
+}
+
 void TextureManager::LoadResource( streaming::ident_t localID, const void *dataBuf, size_t memSize )
 {
-    exclusive_lock_acquire <std::shared_timed_mutex> ctxLoadTXD( this->lockTextureContext );
-
     TexDictResource *texEntry = this->texDictList[ localID ];
+
+    assert( texEntry != NULL );
+
+    NativeSRW_Exclusive ctxLoadTXD( texEntry->lockResourceLoad );
 
     // Load the TXD resource.
     rw::TexDictionary *txdRes = NULL;
@@ -163,15 +272,33 @@ void TextureManager::LoadResource( streaming::ident_t localID, const void *dataB
 
 void TextureManager::UnloadResource( streaming::ident_t localID )
 {
-    exclusive_lock_acquire <std::shared_timed_mutex> ctxUnloadTXD( this->lockTextureContext );
-
     TexDictResource *texEntry = this->texDictList[ localID ];
+
+    assert( texEntry != NULL );
+
+    NativeSRW_Exclusive( texEntry->lockResourceLoad );
 
     // Unload the TXD again.
     {
-        assert( texEntry->txdPtr != NULL );
+        rw::TexDictionary *txdObj = texEntry->txdPtr;
 
-        texEntry->txdPtr->destroy();
+        assert( txdObj != NULL );
+
+        // Make sure we dont have this TXD object as active current TXD or something.
+        {
+            shared_lock_acquire <std::shared_timed_mutex> ctxCleanUpCurrentTXD( this->lockTXDEnvList );
+
+            LIST_FOREACH_BEGIN(ThreadLocal_CurrentTXDEnv, this->_tlCurrentTXDEnvList.root, node)
+
+                if ( item->currentTXD == txdObj )
+                {
+                    item->currentTXD = NULL;
+                }
+
+            LIST_FOREACH_END
+        }
+
+        txdObj->destroy();
     }
 
     texEntry->txdPtr = NULL;
