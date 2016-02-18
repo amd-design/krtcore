@@ -26,6 +26,9 @@ struct ModelManager : public streaming::StreamingTypeInterface
     {
         inline streaming::ident_t GetID( void ) const           { return this->id; }
         inline eModelType GetType( void ) const                 { return this->modelType; }
+        inline float GetLODDistance( void ) const               { return this->lodDistance; }
+
+        inline ModelResource* GetLODModel( void )               { return this->lod_model; }
 
         rw::Object* CloneModel( void );
         void ReleaseModel( rw::Object *rwobj );
@@ -35,7 +38,7 @@ struct ModelManager : public streaming::StreamingTypeInterface
 
         static void NativeReleaseModel( rw::Object *rwobj );
 
-        inline ModelResource( vfs::DevicePtr device, std::string pathToRes ) : vfsResLoc( device, pathToRes )
+        inline ModelResource( vfs::DevicePtr device, std::string pathToRes ) : vfsResLoc( device, std::move( pathToRes ) )
         {
             return;
         }
@@ -51,6 +54,8 @@ struct ModelManager : public streaming::StreamingTypeInterface
         streaming::ident_t texDictID;
         float lodDistance;
         int flags;
+
+        ModelResource *lod_model;   // model of a lower quality model than this one.
 
         eModelType modelType;
 
@@ -86,6 +91,9 @@ private:
     std::vector <ModelResource*> models;
 
     std::map <std::string, ModelResource*> modelByName;
+
+    std::map <std::string, ModelResource*> basifierLookup;
+    std::map <std::string, ModelResource*> lodifierLookup;
 };
 
 }

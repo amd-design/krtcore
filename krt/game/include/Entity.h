@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Streaming.h"
+#include "ModelInfo.h"
 
 // Entity class for having actual objects in the world of things.
 
@@ -9,7 +10,10 @@ namespace krt
 
 struct Entity
 {
-    Entity( void );
+    friend struct World;
+    friend class Game;
+
+    Entity( Game *ourGame );
     ~Entity();
 
     void SetModelIndex( streaming::ident_t modelID );
@@ -17,16 +21,52 @@ struct Entity
     bool CreateRWObject( void );
     void DeleteRWObject( void );
 
-    void SetMatrix( const rw::Matrix& mat );
+    void SetModelling( const rw::Matrix& mat );
+    const rw::Matrix& GetModelling( void ) const;
     const rw::Matrix& GetMatrix( void ) const;
 
-    //todo.
+    bool GetWorldBoundingSphere( rw::Sphere& sphere ) const;
+
+    void LinkToWorld( World *theWorld );
+    World* GetWorld( void );
+
+    void SetLODEntity( Entity *lodInst );
+    Entity* GetLODEntity( void );
+
+    bool IsLowerLODOf( Entity *inst ) const;
+    bool IsHigherLODOf( Entity *inst ) const;
+
+    ModelManager::ModelResource* GetModelInfo( void ) const;
+
+    inline Game* GetGame( void ) const          { return this->ourGame; }
 
 private:
+    Game *ourGame;
+
+    NestedListEntry <Entity> gameNode;
+
     streaming::ident_t modelID;
 
+    int interiorId;
+
+    // Some entity flags given by IPL.
+    bool isUnderwater;
+    bool isTunnelObject;
+    bool isTunnelTransition;
+    bool isUnimportantToStreamer;
+
     rw::Matrix matrix;
+    bool hasLocalMatrix;
+
     rw::Object *rwObject;
+
+    Entity *higherQualityEntity;
+    Entity *lowerQualityEntity;
+
+    // Node of the world entity list.
+    NestedListEntry <Entity> worldNode;
+
+    World *onWorld;
 };
 
 }

@@ -55,7 +55,7 @@ TextureManager::~TextureManager( void )
         delete texDict;
     }
 
-    // Clear addressable lists.
+    // Clear addressible lists.
     this->texDictMap.clear();
     this->texDictList.clear();
 

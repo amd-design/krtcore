@@ -9,6 +9,7 @@
 #include "Streaming.h"
 #include "TexDict.h"
 #include "ModelInfo.h"
+#include "World.h"
 
 #include "Console.Commands.h"
 
@@ -17,6 +18,7 @@ namespace krt
 
 class Game
 {
+    friend struct Entity;
 public:
     Game( void );
     ~Game( void );
@@ -28,6 +30,8 @@ public:
     inline streaming::StreamMan& GetStreaming( void )           { return this->streaming; }
     inline TextureManager& GetTextureManager( void )            { return this->texManager; }
     inline ModelManager& GetModelManager( void )                { return this->modelManager; }
+
+    inline World* GetWorld( void )                              { return &theWorld; }
 
     void LoadIMG( std::string relPath );
 
@@ -43,6 +47,10 @@ private:
 
     TextureManager texManager;
     ModelManager modelManager;
+
+    World theWorld;
+
+    NestedList <Entity> activeEntities;
 };
 
 extern Game *theGame;

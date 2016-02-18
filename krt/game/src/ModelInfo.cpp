@@ -34,6 +34,8 @@ ModelManager::~ModelManager( void )
 
     this->models.clear();
     this->modelByName.clear();
+    this->basifierLookup.clear();
+    this->lodifierLookup.clear();
 
     streaming.UnregisterResourceType( MODEL_ID_BASE );
 }
@@ -55,6 +57,17 @@ void ModelManager::RegisterAtomicModel(
         }
     }
 
+    // Check whether we already have a model that goes by that name.
+    {
+        auto findIter = this->modelByName.find( name );
+
+        if ( findIter != this->modelByName.end() )
+        {
+            // The name is already taken, so bail.
+            return;
+        }
+    }
+
     // Get the device this model is bound to.
     std::string pathPrefix = theGame->GetDevicePathPrefix();
 
@@ -68,6 +81,13 @@ void ModelManager::RegisterAtomicModel(
         return;
     }
 
+    // Check whether this resource even exists.
+    if ( resDevice->GetLength( devPath ) == -1 )
+    {
+        // Does not exist, I think.
+        return;
+    }
+
     ModelResource *modelEntry = new ModelResource( resDevice, std::move( devPath ) );
 
     modelEntry->manager = this;
@@ -78,6 +98,7 @@ void ModelManager::RegisterAtomicModel(
     modelEntry->flags = flags;
     modelEntry->modelPtr = NULL;
     modelEntry->modelType = eModelType::ATOMIC;
+    modelEntry->lod_model = NULL;
 
     modelEntry->lockModelLoading = SRWLOCK_INIT;
 
@@ -114,6 +135,63 @@ void ModelManager::RegisterAtomicModel(
         modelEntry->texDictID = texDictID;
     }
 
+    // Check whether we are a LOD model.
+    bool isLODModel = false;
+
+    if ( name.size() >= 4 )
+    {
+        // We are only interresting for LOD matching if our name is longer than three characters.
+        std::string lod_id = name.substr( 3 );
+
+        if ( strncmp( name.c_str(), "LOD", 3 ) == 0 )
+        {
+            isLODModel = true;
+        }
+
+        // If we are a LOD model, we have to check whether there already is a model that would want this as LOD instance.
+        // Otherwise we have to check whether there already is a LOD model that would map to us.
+        if ( isLODModel )
+        {
+            // DO NOTE that we lookup for the last model that registered itself as base here.
+            // There can be multiple that map to the same base id in the IDE files, and we have to be
+            // careful about that if we ever want to support unregistering of models.
+            auto findBaseModel = this->basifierLookup.find( lod_id );
+
+            if ( findBaseModel != this->basifierLookup.end() )
+            {
+                // We found a base model to map to!
+                ModelResource *baseModelEntry = findBaseModel->second;
+
+                baseModelEntry->lod_model = modelEntry;
+            }
+        }
+        else
+        {
+            // Check whether a LOD model already exists that should map to us.
+            auto findLODModel = this->lodifierLookup.find( lod_id );
+
+            if ( findLODModel != this->lodifierLookup.end() )
+            {
+                // Good catch. There is a LOD model already that should be mapped to us.
+                ModelResource *lodModelEntry = findLODModel->second;
+
+                modelEntry->lod_model = lodModelEntry;
+            }
+        }
+
+        // Register us for lookup.
+        if ( isLODModel )
+        {
+            // Register us in the LOD lookup map.
+            this->lodifierLookup.insert( std::make_pair( std::move( lod_id ), modelEntry ) );
+        }
+        else
+        {
+            // We are not a LOD model, so lets register us as base model.
+            this->basifierLookup.insert( std::make_pair( std::move( lod_id ), modelEntry ) );
+        }
+    }
+
     // Store us. :)
     this->modelByName.insert( std::make_pair( name, modelEntry ) );
 
@@ -121,6 +199,8 @@ void ModelManager::RegisterAtomicModel(
 
     // Success!
 }
+
+// TODO: maybe allow unregistering of models.
 
 ModelManager::ModelResource* ModelManager::GetModelByID( streaming::ident_t id )
 {
@@ -245,9 +325,6 @@ void ModelManager::LoadResource( streaming::ident_t localID, const void *dataBuf
 
             if ( txdID != -1 )
             {
-                // TODO: this does not work because this thing is a global variable.
-                // It breaks multi-threaded loading, which is a real shame.
-                // Solution: wait till tomorrow so that aap has built in some texture lookup function!
                 texManager.SetCurrentTXD( txdID );
             }
         }

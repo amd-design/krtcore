@@ -46,19 +46,22 @@ Game::Game( void ) : streaming( GAME_NUM_STREAMING_CHANNELS ), texManager( strea
     else if ( stricmp( computerName, "DESKTOP" ) == 0 )
     {
         // Martin's thing.
-        this->gameDir = "C:\\Program Files (x86)\\Rockstar Games\\GTA San Andreas\\";
+        this->gameDir = "D:\\gtaiso\\unpack\\gta3\\";
     }
     else
     {
         // Add your own, meow.
     }
 
+    // Set up game related things.
+    LIST_CLEAR( this->activeEntities.root );
+
     // Mount the main game archive.
     this->LoadIMG( "MODELS\\GTA3.IMG" );
     this->LoadIMG( "MODELS\\GTA_INT.IMG" );
 
     // Load game files!
-    this->RunCommandFile( "DATA\\GTA.DAT" );
+    this->RunCommandFile( "DATA\\GTA3.DAT" );
 
     // Do a test that loads all game models.
     modelManager.LoadAllModels();
@@ -66,7 +69,16 @@ Game::Game( void ) : streaming( GAME_NUM_STREAMING_CHANNELS ), texManager( strea
 
 Game::~Game( void )
 {
-    // TODO.
+    // Delete all our entities.
+    {
+        while ( !LIST_EMPTY( this->activeEntities.root ) )
+        {
+            Entity *entity = LIST_GETITEM( Entity, this->activeEntities.root.next, gameNode );
+
+            // It will remove itself from the list.
+            delete entity;
+        }
+    }
 
     // There is no more game.
     theGame = NULL;
@@ -332,6 +344,9 @@ inline std::stringstream get_file_stream( std::string relPath )
 
     vfs::StreamPtr filePtr = vfs::OpenRead( relPath );
 
+    if ( filePtr == NULL )
+        return std::stringstream();
+
     std::vector <std::uint8_t> fileData = filePtr->ReadToEnd();
 
     return std::stringstream( std::string( fileData.begin(), fileData.end() ), std::ios::in );
@@ -385,8 +400,18 @@ void Game::LoadIDEFile( std::string relPath )
 
                     if ( isObjectSection )
                     {
-                        if ( args.size() == 5 )
+                        // There are actually different model types defined by how many entries are in the line.
+                        // This is pretty clever.
+                        bool isNonBreakable = false;
+                        bool isBreakable = false;
+                        bool isComplexBreakable = false;
+
+                        // TODO: actually properly parse each model type and create appropriate model infos for them.
+
+                        if ( args.size() == 5 ) // Non-breakable (SA)
                         {
+                            isNonBreakable = true;
+
                             // Process this. :)
                             streaming::ident_t id = atoi( args[0].c_str() );
                             const std::string& modelName = args[1];
@@ -394,11 +419,51 @@ void Game::LoadIDEFile( std::string relPath )
                             double lodDistance = atof( args[3].c_str() );
                             std::uint32_t flags = atoi( args[4].c_str() );
 
-                            // TODO: meow, actually implement this.
-                            // need a good resource location idea for this :3
-
                             modelManager.RegisterAtomicModel( id, modelName, txdName, (float)lodDistance, flags, modelName + ".dff" );
                         }
+                        else if ( args.size() == 6 )
+                        {
+                            isNonBreakable = true;
+
+                            streaming::ident_t id = atoi( args[0].c_str() );
+                            const std::string& modelName = args[1];
+                            const std::string& txdName = args[2];
+                            int meshCount = atoi( args[3].c_str() );    // should be 1.
+                            float drawDistance = (float)atof( args[4].c_str() );
+                            std::uint32_t flags = atoi( args[5].c_str() );
+
+                            modelManager.RegisterAtomicModel( id, modelName, txdName, drawDistance, flags, modelName + ".dff" );
+                        }
+                        else if ( args.size() == 7 )
+                        {
+                            isBreakable = true;
+
+                            streaming::ident_t id = atoi( args[0].c_str() );
+                            const std::string& modelName = args[1];
+                            const std::string& txdName = args[2];
+                            int meshCount = atoi( args[3].c_str() );    // should be 1.
+                            float drawDistance = (float)atof( args[4].c_str() );
+                            float drawDistance2 = (float)atof( args[5].c_str() );
+                            std::uint32_t flags = atoi( args[6].c_str() );
+
+                            modelManager.RegisterAtomicModel( id, modelName, txdName, drawDistance, flags, modelName + ".dff" );
+                        }
+                        else if ( args.size() == 8 )
+                        {
+                            isComplexBreakable = true;
+
+                            streaming::ident_t id = atoi( args[0].c_str() );
+                            const std::string& modelName = args[1];
+                            const std::string& txdName = args[2];
+                            int meshCount = atoi( args[3].c_str() );    // should be 1.
+                            float drawDistance = (float)atof( args[4].c_str() );
+                            float drawDistance2 = (float)atof( args[5].c_str() );
+                            float drawDistance3 = (float)atof( args[6].c_str() );
+                            std::uint32_t flags = atoi( args[7].c_str() );
+
+                            modelManager.RegisterAtomicModel( id, modelName, txdName, drawDistance, flags, modelName + ".dff" );
+                        }
+
                         // TODO: is there any different format with less or more arguments?
                         // maybe for IPL?
                     }
@@ -419,37 +484,400 @@ void Game::LoadIDEFile( std::string relPath )
     }
 }
 
-ConsoleCommand ideLoadCmd( "IDE",
-    [] ( const std::string& fileName )
+struct sa_iplInstance_t
 {
-    theGame->LoadIDEFile( fileName );
-});
+    rw::V3d                 position;           // 0
+    rw::Quat                quatRotation;       // 12
+    streaming::ident_t      modelIndex;         // 28
+    union
+    {
+        struct
+        {
+            unsigned char   areaIndex;          // 32
+            unsigned char   unimportant : 1;    // 33, not that important to keep streamed
+            unsigned char   unusedFlag1 : 1;
+            unsigned char   underwater : 1;     // entity is placed underwater
+            unsigned char   isTunnel : 1;       // is tunnel segment
+            unsigned char   isTunnelTrans : 1;  // is tunnel transition segment
+            unsigned char   padFlags : 3;       // unused
+            unsigned char   pad[2];             // 34
+        };
+        unsigned int        uiFlagNumber;
+    };
+    int                     lodIndex;           // 36, index inside of the .ipl file pointing at the LOD instance.
+};
+
+// Code from MTA.
+static void QuatToMatrix(const rw::Quat& q, rw::Matrix& m)
+{
+    float xx = q.x * q.x;
+    float xy = q.x * q.y;
+    float xz = q.x * q.z;
+    float xw = q.x * q.w;
+
+    float yy = q.y * q.y;
+    float yz = q.y * q.z;
+    float yw = q.y * q.w;
+
+    float zz = q.z * q.z;
+    float zw = q.z * q.w;
+
+    m.right.x =       1.0f -  2.0f * ( yy + zz );
+    m.right.y =               2.0f * ( xy - zw );
+    m.right.z =               2.0f * ( xz + yw );
+
+    m.up.x =                  2.0f * ( xy + zw );
+    m.up.y =          1.0f -  2.0f * ( xx + zz );
+    m.up.z =                  2.0f * ( yz - xw );
+
+    m.at.x =                  2.0f * ( xz - yw );
+    m.at.y =                  2.0f * ( yz + xw );
+    m.at.z =          1.0f -  2.0f * ( xx + yy );
+}
 
 // Data file loaders!
 void Game::LoadIPLFile( std::string relPath )
 {
-    std::string dataFilePath = GetGamePath( relPath );
+    std::stringstream iplFileData = get_file_stream( GetGamePath( relPath ) );
 
-    
+    bool isInSection = false;
+    bool isInstSection = false;
+
+    struct inst_section_manager
+    {
+        inline void RegisterGTA3Instance(
+            streaming::ident_t modelID,
+            int areaCode,   // optional: zero by default.
+            rw::V3d position,
+            rw::V3d scale,
+            rw::Quat rotation
+        )
+        {
+            // I have no actual idea how things are made exactly, but lets just register it somehow.
+            ModelManager::ModelResource *modelInfo = theGame->GetModelManager().GetModelByID( modelID );
+
+            if ( !modelInfo )
+                return;
+
+            Entity *resultEntity = new Entity( theGame );
+
+            resultEntity->SetModelIndex( modelID );
+
+            // Assign the matrix.
+            {
+                rw::Matrix instMatrix;
+
+                QuatToMatrix( rotation, instMatrix );
+
+                instMatrix.rightw = 0;
+                instMatrix.atw = 0;
+                instMatrix.upw = 0;
+                instMatrix.pos = position;
+                instMatrix.posw = 1;
+
+                resultEntity->SetModelling( instMatrix );
+            }
+
+            resultEntity->interiorId = areaCode;
+
+            // Register this instance entity.
+            // Note that we have no support for LOD instances here.
+            lod_inst_entity inst_info;
+            inst_info.lod_id = -1;
+            inst_info.entity = resultEntity;
+
+            this->instances.push_back( std::move( inst_info ) );
+        }
+
+        inline void RegisterBinarySAInstance( sa_iplInstance_t& instData )
+        {
+            ModelManager::ModelResource *modelInfo = theGame->GetModelManager().GetModelByID( instData.modelIndex );
+
+            if ( !modelInfo )
+                return;
+
+            Entity *resultEntity = NULL;
+
+            // TODO: check dynamic object properties.
+            // if dynamic property exists, this is actually an object.
+            {
+                // TODO: there can be some weird buildings too.
+
+                resultEntity = new Entity( theGame );
+
+                resultEntity->SetModelIndex( instData.modelIndex );
+
+                // dont write z buffer flag?
+            }
+
+            // Convert the Quat to a matrix and assign it.
+            {
+                rw::Matrix instMatrix;
+
+                QuatToMatrix( instData.quatRotation, instMatrix );
+
+                instMatrix.rightw = 0;
+                instMatrix.atw = 0;
+                instMatrix.upw = 0;
+                instMatrix.pos = instData.position;
+                instMatrix.posw = 1;
+
+                resultEntity->SetModelling( instMatrix );
+            }
+
+            // Set flags.
+            if ( instData.underwater )
+            {
+                resultEntity->isUnderwater = true;
+            }
+
+            if ( instData.isTunnel )
+            {
+                resultEntity->isTunnelObject = true;
+            }
+
+            if ( instData.isTunnelTrans )
+            {
+                resultEntity->isTunnelTransition = true;
+            }
+
+            if ( instData.unimportant )
+            {
+                resultEntity->isUnimportantToStreamer = true;
+            }
+
+            resultEntity->interiorId = instData.areaIndex;
+
+            // Register this instance entity.
+            lod_inst_entity inst_info;
+            inst_info.lod_id = instData.lodIndex;
+            inst_info.entity = resultEntity;
+
+            this->instances.push_back( std::move( inst_info ) );
+        }
+
+        inline void Finalize( void )
+        {
+            // Map LOD instances.
+            size_t numInstances = this->instances.size();
+
+            for ( const lod_inst_entity& inst : this->instances )
+            {
+                int lod_id = inst.lod_id;
+
+                Entity *baseEntity = inst.entity;
+
+                // Set up LOD entity link.
+                if ( lod_id > 0 && lod_id <= numInstances )
+                {
+                    const lod_inst_entity& lod_inst = this->instances[ lod_id - 1 ];
+
+                    Entity *lodEntity = lod_inst.entity;
+
+                    if ( baseEntity != lodEntity && lodEntity->IsLowerLODOf( baseEntity ) == false )
+                    {
+                        baseEntity->SetLODEntity( lodEntity );
+                    }
+                }
+
+                // Register this entity into the world.
+                baseEntity->LinkToWorld( theGame->GetWorld() );
+            }
+
+            // If certain entities have LOD "models" and their entities do not have lod LODs already.
+            // Then automatically create lower LODs for them.
+            for ( const lod_inst_entity& inst : this->instances )
+            {
+                Entity *entity = inst.entity;
+
+                if ( entity->GetLODEntity() == NULL )
+                {
+                    ModelManager::ModelResource *modelEntry = entity->GetModelInfo();
+
+                    if ( modelEntry )
+                    {
+                        ModelManager::ModelResource *lodModel = modelEntry->GetLODModel();
+
+                        if ( lodModel )
+                        {
+                            // Actually create an automatic LOD instance placed at the exact same position.
+                            Entity *lodInst = new Entity( entity->GetGame() );
+
+                            lodInst->SetModelIndex( lodModel->GetID() );
+                            lodInst->SetModelling( entity->GetModelling() );
+
+                            entity->SetLODEntity( lodInst );
+
+                            lodInst->LinkToWorld( theGame->GetWorld() );
+                        }
+                    }
+                }
+            }
+
+            // Success.
+            this->instances.clear();
+        }
+
+    private:
+        struct lod_inst_entity
+        {
+            int lod_id;
+            Entity *entity;
+        };
+
+        std::vector <lod_inst_entity> instances;
+    };
+
+    inst_section_manager inst_sec_man;
+
+    while ( !iplFileData.eof() )
+    {
+        std::string iplLine = get_cfg_line( iplFileData );
+
+        // Process this line.
+        if ( ignore_line( iplLine ) == false )
+        {
+            if ( !isInSection )
+            {
+                if ( iplLine == "inst" )
+                {
+                    isInstSection = true;
+
+                    isInSection = true;
+                }
+            }
+            else
+            {
+                if ( iplLine == "end" )
+                {
+                    isInSection = false;
+
+                    if ( isInstSection )
+                    {
+                        inst_sec_man.Finalize();
+
+                        isInstSection = false;
+                    }
+                }
+                else
+                {
+                    if ( isInstSection )
+                    {
+                        std::vector <std::string> args = split_csv_args( iplLine );
+
+                        if ( args.size() == 11 )
+                        {
+                            // San Andreas map line.
+                            // We should kinda do what the GTA:SA engine does here.
+                            sa_iplInstance_t iplInst;
+                            iplInst.modelIndex = atoi( args[0].c_str() );
+                            iplInst.uiFlagNumber = atoi( args[2].c_str() );
+                            iplInst.position.x = (float)atof( args[3].c_str() );
+                            iplInst.position.y = (float)atof( args[4].c_str() );
+                            iplInst.position.z = (float)atof( args[5].c_str() );
+                            iplInst.quatRotation.x = (float)atof( args[6].c_str() );
+                            iplInst.quatRotation.y = (float)atof( args[7].c_str() );
+                            iplInst.quatRotation.z = (float)atof( args[8].c_str() );
+                            iplInst.quatRotation.w = (float)atof( args[9].c_str() );
+                            iplInst.lodIndex = atoi( args[10].c_str() );
+
+                            const std::string& modelName = args[1];
+
+                            inst_sec_man.RegisterBinarySAInstance( iplInst );
+                        }
+                        else if ( args.size() == 12 )
+                        {
+                            // GTA3/VC map line.
+                            streaming::ident_t modelID = atoi( args[0].c_str() );
+                            rw::V3d pos(
+                                (float)atof( args[2].c_str() ),
+                                (float)atof( args[3].c_str() ),
+                                (float)atof( args[4].c_str() )
+                            );
+                            rw::V3d scale(
+                                (float)atof( args[5].c_str() ),
+                                (float)atof( args[6].c_str() ),
+                                (float)atof( args[7].c_str() )
+                            );
+                            rw::Quat rotQuat;
+                            rotQuat.x = (float)atof( args[8].c_str() );
+                            rotQuat.y = (float)atof( args[9].c_str() );
+                            rotQuat.z = (float)atof( args[10].c_str() );
+                            rotQuat.w = (float)atof( args[11].c_str() );
+
+                            inst_sec_man.RegisterGTA3Instance(
+                                modelID, 0,
+                                pos, scale, rotQuat
+                            );
+                        }
+                        else if ( args.size() == 13 )
+                        {
+                            // Vice City map line.
+                            streaming::ident_t modelID = atoi( args[0].c_str() );
+                            int areaCode = atoi( args[2].c_str() );
+                            rw::V3d pos(
+                                (float)atof( args[3].c_str() ),
+                                (float)atof( args[4].c_str() ),
+                                (float)atof( args[5].c_str() )
+                            );
+                            rw::V3d scale(
+                                (float)atof( args[6].c_str() ),
+                                (float)atof( args[7].c_str() ),
+                                (float)atof( args[8].c_str() )
+                            );
+                            rw::Quat rotQuat;
+                            rotQuat.x = (float)atof( args[9].c_str() );
+                            rotQuat.y = (float)atof( args[10].c_str() );
+                            rotQuat.z = (float)atof( args[11].c_str() );
+                            rotQuat.w = (float)atof( args[12].c_str() );
+
+                            inst_sec_man.RegisterGTA3Instance(
+                                modelID, areaCode,
+                                pos, scale, rotQuat
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Maybe they forgot an "end" statement, so make sure things are registered properly.
+    if ( isInstSection )
+    {
+        inst_sec_man.Finalize();
+
+        isInstSection = false;
+    }
 }
 
 void Game::RunCommandFile( std::string relPath )
 {
 	vfs::StreamPtr stream = vfs::OpenRead(this->GetGamePath(relPath));
+
+    if ( stream == NULL )
+        return;
+
 	std::vector<uint8_t> string = stream->ReadToEnd();
 
 	console::Context localConsole;
 
 	ConsoleCommand iplLoadCmd(&localConsole, "IPL",
-							  [] (const std::string& fileName)
+							  [&] (const std::string& fileName)
 	{
-		theGame->LoadIPLFile(fileName);
+		this->LoadIPLFile(fileName);
 	});
 
+    ConsoleCommand ideLoadCmd(&localConsole, "IDE",
+        [&] ( const std::string& fileName )
+    {
+        this->LoadIDEFile( fileName );
+    });
+
 	ConsoleCommand imgMountCmd(&localConsole, "IMG",
-							   [] (const std::string& path)
+							   [&] (const std::string& path)
 	{
-		theGame->LoadIMG(path);
+		this->LoadIMG(path);
 	});
 
 	localConsole.AddToBuffer(std::string(reinterpret_cast<char*>(string.data()), string.size()));
