@@ -11,6 +11,10 @@
 #include "CdImageDevice.h"
 #include "vfs/Manager.h"
 
+#include "EventSystem.h"
+
+#include "sys/Timer.h"
+
 #include <src/rwgta.h>
 
 #pragma warning(disable : 4996)
@@ -71,7 +75,7 @@ Game::Game(void) : streaming(GAME_NUM_STREAMING_CHANNELS), texManager(streaming)
 	universe->Load();
 
 	// Do a test that loads all game models.
-	modelManager.LoadAllModels();
+	//modelManager.LoadAllModels();
 }
 
 Game::~Game(void)
@@ -89,6 +93,64 @@ Game::~Game(void)
 
 	// There is no more game.
 	theGame = NULL;
+}
+
+void Game::Run()
+{
+	sys::TimerContext timerContext;
+
+	EventSystem eventSystem;
+
+	// run the main game loop
+	bool wantsToExit  = false;
+	uint64_t lastTime = 0;
+
+	while (!wantsToExit)
+	{
+		// limit frame rate and handle events
+		// TODO: non-busy wait?
+		int minMillis   = (1000 / 60); // 60 is to be replaced by a 'max fps' console value
+		uint32_t millis = 0;
+
+		uint64_t thisTime = 0;
+
+		do
+		{
+			thisTime = eventSystem.HandleEvents();
+
+			millis = thisTime - lastTime;
+		} while (millis < minMillis);
+
+		// handle time scaling
+		float scale = 1.0f; // to be replaced by a console value, again
+		millis *= scale;
+
+		if (millis < 1)
+		{
+			millis = 1;
+		}
+		// prevent too big jumps from being made
+		else if (millis > 5000)
+		{
+			millis = 5000;
+		}
+
+		if (millis > 500)
+		{
+			printf("long frame: %d millis\n", millis);
+		}
+
+		// store timing values for this frame
+		this->dT            = millis / 1000.0f;
+		this->lastFrameTime = millis;
+
+		lastTime = thisTime;
+
+		// execute the command buffer for the global console
+		console::ExecuteBuffer();
+
+		// whatever else might come to mind
+	}
 }
 
 GameUniversePtr Game::AddUniverse(const GameConfiguration& configuration)

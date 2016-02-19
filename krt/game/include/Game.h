@@ -25,6 +25,8 @@ class Game
 	Game(void);
 	~Game(void);
 
+	void Run();
+
 	std::string GetGamePath(std::string relPath);
 
 	inline streaming::StreamMan& GetStreaming(void) { return this->streaming; }
@@ -33,6 +35,10 @@ class Game
 
 	inline World* GetWorld(void) { return &theWorld; }
 
+	inline float GetDelta() { return dT; }
+
+	inline uint32_t GetLastFrameTime() { return lastFrameTime; }
+
 	std::string GetDevicePathPrefix(void) { return "gta3:/"; }
 
 	GameUniversePtr AddUniverse(const GameConfiguration& configuration);
@@ -40,6 +46,9 @@ class Game
 	GameUniversePtr GetUniverse(const std::string& name);
 
   private:
+	float dT;
+	uint32_t lastFrameTime;
+
 	std::string gameDir;
 
 	streaming::StreamMan streaming;

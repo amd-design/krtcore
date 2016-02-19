@@ -34,6 +34,8 @@ int Main::Run(const ProgramArguments& arguments)
 {
     Game TheGame;
 
+	TheGame.Run();
+
 	ConsoleCommand cmd("a", [] (int a, int b, int c)
 	{
 		printf("%d %d %d\n", a, b, c);
