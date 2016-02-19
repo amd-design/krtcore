@@ -9,7 +9,7 @@
 namespace krt
 {
 
-ModelManager::ModelManager( streaming::StreamMan& streaming, TextureManager& texManager ) : streaming( streaming ), texManager( texManager )
+ModelManager::ModelManager( streaming::StreamMan& streaming, TextureManager& texManager ) : streaming( streaming ), texManager( texManager ), curModelId (0)
 {
     bool didRegister = streaming.RegisterResourceType( MODEL_ID_BASE, MAX_MODELS, this );
 
@@ -40,22 +40,13 @@ ModelManager::~ModelManager( void )
     streaming.UnregisterResourceType( MODEL_ID_BASE );
 }
 
-void ModelManager::RegisterAtomicModel(
-    streaming::ident_t id,
+streaming::ident_t ModelManager::RegisterAtomicModel(
     std::string name, std::string texDictName, float lodDistance, int flags,
-    std::string relFilePath
+    std::string absFilePath
 )
 {
-    // Check whether that id is taken already.
-    {
-        ModelResource *alreadyTaken = this->GetModelByID( id );
-
-        if ( alreadyTaken )
-        {
-            // Cannot take this id because occupied, meow.
-            return;
-        }
-    }
+	// Get an identifier
+	streaming::ident_t id = (curModelId.fetch_add(1)) + MODEL_ID_BASE;
 
     // Check whether we already have a model that goes by that name.
     {
@@ -64,28 +55,26 @@ void ModelManager::RegisterAtomicModel(
         if ( findIter != this->modelByName.end() )
         {
             // The name is already taken, so bail.
-            return;
+            return findIter->second->GetID();
         }
     }
 
     // Get the device this model is bound to.
-    std::string pathPrefix = theGame->GetDevicePathPrefix();
-
-    std::string devPath = ( pathPrefix + relFilePath );
+    std::string devPath = ( absFilePath );
 
     vfs::DevicePtr resDevice = vfs::GetDevice( devPath );
 
     if ( resDevice == nullptr )
     {
         // No device means we do not care.
-        return;
+        return -1;
     }
 
     // Check whether this resource even exists.
     if ( resDevice->GetLength( devPath ) == -1 )
     {
         // Does not exist, I think.
-        return;
+        return -1;
     }
 
     ModelResource *modelEntry = new ModelResource( resDevice, std::move( devPath ) );
@@ -109,7 +98,7 @@ void ModelManager::RegisterAtomicModel(
         // The resource does not really exist I guess.
         delete modelEntry;
 
-        return;
+        return -1;
     }
 
     // Find the texture dictionary that should link with this model.
@@ -198,6 +187,7 @@ void ModelManager::RegisterAtomicModel(
     this->models[ id - MODEL_ID_BASE ] = modelEntry;
 
     // Success!
+	return id;
 }
 
 // TODO: maybe allow unregistering of models.

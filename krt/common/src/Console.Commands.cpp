@@ -8,7 +8,7 @@
 namespace krt
 {
 ConsoleCommandManager::ConsoleCommandManager(console::Context* parentContext)
-	: m_parentContext(parentContext)
+	: m_parentContext(parentContext), m_curToken(0)
 {
 }
 

@@ -69,10 +69,9 @@ struct ModelManager : public streaming::StreamingTypeInterface
     ModelManager( streaming::StreamMan& streaming, TextureManager& texManager );
     ~ModelManager( void );
 
-    void RegisterAtomicModel(
-        streaming::ident_t id,
+    streaming::ident_t RegisterAtomicModel(
         std::string name, std::string texDictName, float lodDistance, int flags,
-        std::string relFilePath
+        std::string absFilePath
     );
 
     ModelResource* GetModelByID( streaming::ident_t id );
@@ -89,6 +88,8 @@ private:
     TextureManager& texManager;
 
     std::vector <ModelResource*> models;
+
+	std::atomic <streaming::ident_t> curModelId;
 
     std::map <std::string, ModelResource*> modelByName;
 

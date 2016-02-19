@@ -7,11 +7,14 @@
 
 namespace krt
 {
+class Game;
 
 struct Entity
 {
+	friend class Game;
     friend struct World;
-    friend class Game;
+    friend class FileLoader;
+	friend struct inst_section_manager; // leaky abstraction?
 
     Entity( Game *ourGame );
     ~Entity();

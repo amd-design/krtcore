@@ -12,6 +12,7 @@
 #include "World.h"
 
 #include "Console.Commands.h"
+#include "GameUniverse.h"
 
 namespace krt
 {
@@ -25,20 +26,17 @@ public:
 
     std::string GetGamePath( std::string relPath );
 
-    void RunCommandFile( std::string relDir );
-
     inline streaming::StreamMan& GetStreaming( void )           { return this->streaming; }
     inline TextureManager& GetTextureManager( void )            { return this->texManager; }
     inline ModelManager& GetModelManager( void )                { return this->modelManager; }
 
     inline World* GetWorld( void )                              { return &theWorld; }
 
-    void LoadIMG( std::string relPath );
-
-    void LoadIDEFile( std::string relPath );
-    void LoadIPLFile( std::string relPath );
-
     std::string GetDevicePathPrefix( void )                     { return "gta3:/"; }
+
+	GameUniversePtr AddUniverse(const GameConfiguration& configuration);
+
+	GameUniversePtr GetUniverse(const std::string& name);
 
 private:
     std::string gameDir;
@@ -51,8 +49,20 @@ private:
     World theWorld;
 
     NestedList <Entity> activeEntities;
+
+	std::vector<GameUniversePtr> universes;
 };
 
 extern Game *theGame;
+
+template<>
+struct ConsoleArgumentType<GameUniversePtr>
+{
+	static bool Parse(const std::string& input, GameUniversePtr* out)
+	{
+		*out = theGame->GetUniverse(input);
+		return true;
+	}
+};
 
 };
