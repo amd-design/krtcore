@@ -16,12 +16,12 @@ static void make_lower(std::string& str)
 	std::transform(str.begin(), str.end(), str.begin(), ::tolower);
 }
 
-inline std::string get_file_name(std::string path, std::string *extOut = NULL)
+inline std::string get_file_name(std::string path, std::string* extOut = NULL)
 {
-	const char *pathIter = path.c_str();
+	const char* pathIter = path.c_str();
 
-	const char *fileNameStart = pathIter;
-	const char *fileExtEnd = NULL;
+	const char* fileNameStart = pathIter;
+	const char* fileExtEnd    = NULL;
 
 	while (char c = *pathIter)
 	{
@@ -94,9 +94,9 @@ inline bool is_white_space(char c)
 	return (c == ' ' || c == '\t');
 }
 
-static inline std::list <std::string> split_cmd_line(std::string line)
+static inline std::list<std::string> split_cmd_line(std::string line)
 {
-	std::list <std::string> argsOut;
+	std::list<std::string> argsOut;
 
 	std::string currentArg;
 
@@ -120,19 +120,19 @@ static inline std::list <std::string> split_cmd_line(std::string line)
 	return argsOut;
 }
 
-static inline std::vector <std::string> split_csv_args(std::string line)
+static inline std::vector<std::string> split_csv_args(std::string line)
 {
-	std::vector <std::string> argsOut;
+	std::vector<std::string> argsOut;
 
-	const char *linePtr = line.c_str();
+	const char* linePtr = line.c_str();
 
-	const char *curLineStart = NULL;
-	const char *curLineEnd = NULL;
+	const char* curLineStart = NULL;
+	const char* curLineEnd   = NULL;
 
 	while (char c = *linePtr)
 	{
 		bool wantsTokenTermination = false;
-		bool wantsTokenAdd = false;
+		bool wantsTokenAdd         = false;
 
 		if (c == ',')
 		{
@@ -141,7 +141,7 @@ static inline std::vector <std::string> split_csv_args(std::string line)
 			if (curLineLen != 0)
 			{
 				wantsTokenTermination = true;
-				wantsTokenAdd = true;
+				wantsTokenAdd         = true;
 			}
 		}
 		else
@@ -172,7 +172,7 @@ static inline std::vector <std::string> split_csv_args(std::string line)
 			argsOut.push_back(std::string(curLineStart, curLineEnd));
 
 			curLineStart = NULL;
-			curLineEnd = NULL;
+			curLineEnd   = NULL;
 		}
 
 		linePtr++;
@@ -197,9 +197,9 @@ static inline std::string get_cfg_line(std::istream& in)
 
 	std::getline(in, line);
 
-	const char *lineIter = line.c_str();
+	const char* lineIter = line.c_str();
 
-	const char *lineStartPos = lineIter;
+	const char* lineStartPos = lineIter;
 
 	while (char c = *lineIter)
 	{
@@ -235,15 +235,15 @@ inline std::stringstream get_file_stream(const std::string& absPath)
 	if (filePtr == NULL)
 		return std::stringstream();
 
-	std::vector <std::uint8_t> fileData = filePtr->ReadToEnd();
+	std::vector<std::uint8_t> fileData = filePtr->ReadToEnd();
 
 	return std::stringstream(std::string(fileData.begin(), fileData.end()), std::ios::in);
 }
 
 static thread_local GameUniversePtr g_currentParseUniverse;
 
-using LineHandler = void(*)(const std::string& line);
-using FinalizeHandler = void(*)();
+using LineHandler     = void (*)(const std::string& line);
+using FinalizeHandler = void (*)();
 
 struct SectionDescriptor
 {
@@ -252,15 +252,13 @@ struct SectionDescriptor
 	FinalizeHandler finalizeHandler;
 
 	SectionDescriptor(const char* typeName, LineHandler handler)
-		: typeName(typeName), handler(handler), finalizeHandler(nullptr)
+	    : typeName(typeName), handler(handler), finalizeHandler(nullptr)
 	{
-
 	}
 
 	SectionDescriptor(const char* typeName, LineHandler handler, FinalizeHandler finalizeHandler)
-		: typeName(typeName), handler(handler), finalizeHandler(finalizeHandler)
+	    : typeName(typeName), handler(handler), finalizeHandler(finalizeHandler)
 	{
-
 	}
 };
 
@@ -333,15 +331,15 @@ static void ProcessSectionedFile(const SectionDescriptor* descriptorList, std::s
 
 static void HandleObjectLine(const std::string& line)
 {
-	std::vector <std::string> args = split_csv_args(line);
+	std::vector<std::string> args = split_csv_args(line);
 
 	// There are actually different model types defined by how many entries are in the line.
 	// This is pretty clever.
-	bool isNonBreakable = false;
-	bool isBreakable = false;
+	bool isNonBreakable     = false;
+	bool isBreakable        = false;
 	bool isComplexBreakable = false;
 
-	streaming::ident_t id = 0;
+	streaming::ident_t id    = 0;
 	streaming::ident_t newID = 0;
 
 	// TODO: actually properly parse each model type and create appropriate model infos for them.
@@ -351,11 +349,11 @@ static void HandleObjectLine(const std::string& line)
 		isNonBreakable = true;
 
 		// Process this. :)
-		id = atoi(args[0].c_str());
+		id                           = atoi(args[0].c_str());
 		const std::string& modelName = args[1];
-		const std::string& txdName = args[2];
-		double lodDistance = atof(args[3].c_str());
-		std::uint32_t flags = atoi(args[4].c_str());
+		const std::string& txdName   = args[2];
+		double lodDistance           = atof(args[3].c_str());
+		std::uint32_t flags          = atoi(args[4].c_str());
 
 		newID = theGame->GetModelManager().RegisterAtomicModel(modelName, txdName, (float)lodDistance, flags, g_currentParseUniverse->GetImageMountPoint() + modelName + ".dff");
 	}
@@ -363,12 +361,12 @@ static void HandleObjectLine(const std::string& line)
 	{
 		isNonBreakable = true;
 
-		id = atoi(args[0].c_str());
+		id                           = atoi(args[0].c_str());
 		const std::string& modelName = args[1];
-		const std::string& txdName = args[2];
-		int meshCount = atoi(args[3].c_str());    // should be 1.
-		float drawDistance = (float)atof(args[4].c_str());
-		std::uint32_t flags = atoi(args[5].c_str());
+		const std::string& txdName   = args[2];
+		int meshCount                = atoi(args[3].c_str()); // should be 1.
+		float drawDistance           = (float)atof(args[4].c_str());
+		std::uint32_t flags          = atoi(args[5].c_str());
 
 		newID = theGame->GetModelManager().RegisterAtomicModel(modelName, txdName, drawDistance, flags, g_currentParseUniverse->GetImageMountPoint() + modelName + ".dff");
 	}
@@ -376,13 +374,13 @@ static void HandleObjectLine(const std::string& line)
 	{
 		isBreakable = true;
 
-		id = atoi(args[0].c_str());
+		id                           = atoi(args[0].c_str());
 		const std::string& modelName = args[1];
-		const std::string& txdName = args[2];
-		int meshCount = atoi(args[3].c_str());    // should be 1.
-		float drawDistance = (float)atof(args[4].c_str());
-		float drawDistance2 = (float)atof(args[5].c_str());
-		std::uint32_t flags = atoi(args[6].c_str());
+		const std::string& txdName   = args[2];
+		int meshCount                = atoi(args[3].c_str()); // should be 1.
+		float drawDistance           = (float)atof(args[4].c_str());
+		float drawDistance2          = (float)atof(args[5].c_str());
+		std::uint32_t flags          = atoi(args[6].c_str());
 
 		newID = theGame->GetModelManager().RegisterAtomicModel(modelName, txdName, drawDistance, flags, g_currentParseUniverse->GetImageMountPoint() + modelName + ".dff");
 	}
@@ -390,14 +388,14 @@ static void HandleObjectLine(const std::string& line)
 	{
 		isComplexBreakable = true;
 
-		id = atoi(args[0].c_str());
+		id                           = atoi(args[0].c_str());
 		const std::string& modelName = args[1];
-		const std::string& txdName = args[2];
-		int meshCount = atoi(args[3].c_str());    // should be 1.
-		float drawDistance = (float)atof(args[4].c_str());
-		float drawDistance2 = (float)atof(args[5].c_str());
-		float drawDistance3 = (float)atof(args[6].c_str());
-		std::uint32_t flags = atoi(args[7].c_str());
+		const std::string& txdName   = args[2];
+		int meshCount                = atoi(args[3].c_str()); // should be 1.
+		float drawDistance           = (float)atof(args[4].c_str());
+		float drawDistance2          = (float)atof(args[5].c_str());
+		float drawDistance3          = (float)atof(args[6].c_str());
+		std::uint32_t flags          = atoi(args[7].c_str());
 
 		newID = theGame->GetModelManager().RegisterAtomicModel(modelName, txdName, drawDistance, flags, g_currentParseUniverse->GetImageMountPoint() + modelName + ".dff");
 	}
@@ -417,21 +415,21 @@ static void HandleObjectLine(const std::string& line)
 
 static void HandleTimedObjectLine(const std::string& line)
 {
-	std::vector <std::string> args = split_csv_args(line);
+	std::vector<std::string> args = split_csv_args(line);
 
-	streaming::ident_t id = 0;
+	streaming::ident_t id    = 0;
 	streaming::ident_t newID = 0;
 
 	if (args.size() == 8) // GTA3, at the least?
 	{
-		id = atoi(args[0].c_str());
+		id                           = atoi(args[0].c_str());
 		const std::string& modelName = args[1];
-		const std::string& txdName = args[2];
-		int meshCount = atoi(args[3].c_str());    // should be 1.
-		float drawDistance = (float)atof(args[4].c_str());
-		std::uint32_t flags = atoi(args[5].c_str());
-		int onHour = atoi(args[6].c_str());
-		int offHour = atoi(args[7].c_str());
+		const std::string& txdName   = args[2];
+		int meshCount                = atoi(args[3].c_str()); // should be 1.
+		float drawDistance           = (float)atof(args[4].c_str());
+		std::uint32_t flags          = atoi(args[5].c_str());
+		int onHour                   = atoi(args[6].c_str());
+		int offHour                  = atoi(args[7].c_str());
 
 		newID = theGame->GetModelManager().RegisterAtomicModel(modelName, txdName, drawDistance, flags, g_currentParseUniverse->GetImageMountPoint() + modelName + ".dff");
 	}
@@ -448,11 +446,11 @@ static void HandleTimedObjectLine(const std::string& line)
 
 static void HandleTxdParentLine(const std::string& line)
 {
-	std::vector <std::string> args = split_csv_args(line);
+	std::vector<std::string> args = split_csv_args(line);
 
 	if (args.size() == 2)
 	{
-		const std::string& txdName = args[0].c_str();
+		const std::string& txdName       = args[0].c_str();
 		const std::string& txdParentName = args[1].c_str();
 
 		// Register a TXD dependency.
@@ -461,11 +459,10 @@ static void HandleTxdParentLine(const std::string& line)
 }
 
 static const SectionDescriptor ideSections[] = {
-	{ "objs", HandleObjectLine },
-	{ "tobj", HandleTimedObjectLine },
-	{ "txdp", HandleTxdParentLine },
-	{ nullptr, nullptr }
-};
+    {"objs", HandleObjectLine},
+    {"tobj", HandleTimedObjectLine},
+    {"txdp", HandleTxdParentLine},
+    {nullptr, nullptr}};
 
 void FileLoader::LoadIDEFile(const std::string& relPath, const GameUniversePtr& universe)
 {
@@ -483,25 +480,24 @@ void FileLoader::LoadIDEFile(const std::string& relPath, const GameUniversePtr& 
 
 struct sa_iplInstance_t
 {
-	rw::V3d                 position;           // 0
-	rw::Quat                quatRotation;       // 12
-	streaming::ident_t      modelIndex;         // 28
-	union
-	{
+	rw::V3d position;              // 0
+	rw::Quat quatRotation;         // 12
+	streaming::ident_t modelIndex; // 28
+	union {
 		struct
 		{
-			unsigned char   areaIndex;          // 32
-			unsigned char   unimportant : 1;    // 33, not that important to keep streamed
-			unsigned char   unusedFlag1 : 1;
-			unsigned char   underwater : 1;     // entity is placed underwater
-			unsigned char   isTunnel : 1;       // is tunnel segment
-			unsigned char   isTunnelTrans : 1;  // is tunnel transition segment
-			unsigned char   padFlags : 3;       // unused
-			unsigned char   pad[2];             // 34
+			unsigned char areaIndex;       // 32
+			unsigned char unimportant : 1; // 33, not that important to keep streamed
+			unsigned char unusedFlag1 : 1;
+			unsigned char underwater : 1;    // entity is placed underwater
+			unsigned char isTunnel : 1;      // is tunnel segment
+			unsigned char isTunnelTrans : 1; // is tunnel transition segment
+			unsigned char padFlags : 3;      // unused
+			unsigned char pad[2];            // 34
 		};
-		unsigned int        uiFlagNumber;
+		unsigned int uiFlagNumber;
 	};
-	int                     lodIndex;           // 36, index inside of the .ipl file pointing at the LOD instance.
+	int lodIndex; // 36, index inside of the .ipl file pointing at the LOD instance.
 };
 
 // Code from MTA.
@@ -535,20 +531,19 @@ static void QuatToMatrix(const rw::Quat& q, rw::Matrix& m)
 struct inst_section_manager
 {
 	inline void RegisterGTA3Instance(
-		streaming::ident_t modelID,
-		int areaCode,   // optional: zero by default.
-		rw::V3d position,
-		rw::V3d scale,
-		rw::Quat rotation
-		)
+	    streaming::ident_t modelID,
+	    int areaCode, // optional: zero by default.
+	    rw::V3d position,
+	    rw::V3d scale,
+	    rw::Quat rotation)
 	{
 		// I have no actual idea how things are made exactly, but lets just register it somehow.
-		ModelManager::ModelResource *modelInfo = theGame->GetModelManager().GetModelByID(g_currentParseUniverse->GetModelIndexMapping(modelID));
+		ModelManager::ModelResource* modelInfo = theGame->GetModelManager().GetModelByID(g_currentParseUniverse->GetModelIndexMapping(modelID));
 
 		if (!modelInfo)
 			return;
 
-		Entity *resultEntity = new Entity(theGame);
+		Entity* resultEntity = new Entity(theGame);
 
 		resultEntity->SetModelIndex(modelID);
 
@@ -559,10 +554,10 @@ struct inst_section_manager
 			QuatToMatrix(rotation, instMatrix);
 
 			instMatrix.rightw = 0;
-			instMatrix.atw = 0;
-			instMatrix.upw = 0;
-			instMatrix.pos = position;
-			instMatrix.posw = 1;
+			instMatrix.atw    = 0;
+			instMatrix.upw    = 0;
+			instMatrix.pos    = position;
+			instMatrix.posw   = 1;
 
 			resultEntity->SetModelling(instMatrix);
 		}
@@ -580,12 +575,12 @@ struct inst_section_manager
 
 	inline void RegisterBinarySAInstance(sa_iplInstance_t& instData)
 	{
-		ModelManager::ModelResource *modelInfo = theGame->GetModelManager().GetModelByID(g_currentParseUniverse->GetModelIndexMapping(instData.modelIndex));
+		ModelManager::ModelResource* modelInfo = theGame->GetModelManager().GetModelByID(g_currentParseUniverse->GetModelIndexMapping(instData.modelIndex));
 
 		if (!modelInfo)
 			return;
 
-		Entity *resultEntity = NULL;
+		Entity* resultEntity = NULL;
 
 		// TODO: check dynamic object properties.
 		// if dynamic property exists, this is actually an object.
@@ -606,10 +601,10 @@ struct inst_section_manager
 			QuatToMatrix(instData.quatRotation, instMatrix);
 
 			instMatrix.rightw = 0;
-			instMatrix.atw = 0;
-			instMatrix.upw = 0;
-			instMatrix.pos = instData.position;
-			instMatrix.posw = 1;
+			instMatrix.atw    = 0;
+			instMatrix.upw    = 0;
+			instMatrix.pos    = instData.position;
+			instMatrix.posw   = 1;
 
 			resultEntity->SetModelling(instMatrix);
 		}
@@ -654,14 +649,14 @@ struct inst_section_manager
 		{
 			int lod_id = inst.lod_id;
 
-			Entity *baseEntity = inst.entity;
+			Entity* baseEntity = inst.entity;
 
 			// Set up LOD entity link.
 			if (lod_id > 0 && lod_id <= numInstances)
 			{
 				const lod_inst_entity& lod_inst = this->instances[lod_id - 1];
 
-				Entity *lodEntity = lod_inst.entity;
+				Entity* lodEntity = lod_inst.entity;
 
 				if (baseEntity != lodEntity && lodEntity->IsLowerLODOf(baseEntity) == false)
 				{
@@ -677,20 +672,20 @@ struct inst_section_manager
 		// Then automatically create lower LODs for them.
 		for (const lod_inst_entity& inst : this->instances)
 		{
-			Entity *entity = inst.entity;
+			Entity* entity = inst.entity;
 
 			if (entity->GetLODEntity() == NULL)
 			{
-				ModelManager::ModelResource *modelEntry = entity->GetModelInfo();
+				ModelManager::ModelResource* modelEntry = entity->GetModelInfo();
 
 				if (modelEntry)
 				{
-					ModelManager::ModelResource *lodModel = modelEntry->GetLODModel();
+					ModelManager::ModelResource* lodModel = modelEntry->GetLODModel();
 
 					if (lodModel)
 					{
 						// Actually create an automatic LOD instance placed at the exact same position.
-						Entity *lodInst = new Entity(entity->GetGame());
+						Entity* lodInst = new Entity(entity->GetGame());
 
 						lodInst->SetModelIndex(lodModel->GetID());
 						lodInst->SetModelling(entity->GetModelling());
@@ -707,37 +702,37 @@ struct inst_section_manager
 		this->instances.clear();
 	}
 
-private:
+  private:
 	struct lod_inst_entity
 	{
 		int lod_id;
-		Entity *entity;
+		Entity* entity;
 	};
 
-	std::vector <lod_inst_entity> instances;
+	std::vector<lod_inst_entity> instances;
 };
 
 static thread_local inst_section_manager inst_sec_man;
 
 static void HandleInstLine(const std::string& line)
 {
-	std::vector <std::string> args = split_csv_args(line);
+	std::vector<std::string> args = split_csv_args(line);
 
 	if (args.size() == 11)
 	{
 		// San Andreas map line.
 		// We should kinda do what the GTA:SA engine does here.
 		sa_iplInstance_t iplInst;
-		iplInst.modelIndex = atoi(args[0].c_str());
-		iplInst.uiFlagNumber = atoi(args[2].c_str());
-		iplInst.position.x = (float)atof(args[3].c_str());
-		iplInst.position.y = (float)atof(args[4].c_str());
-		iplInst.position.z = (float)atof(args[5].c_str());
+		iplInst.modelIndex     = atoi(args[0].c_str());
+		iplInst.uiFlagNumber   = atoi(args[2].c_str());
+		iplInst.position.x     = (float)atof(args[3].c_str());
+		iplInst.position.y     = (float)atof(args[4].c_str());
+		iplInst.position.z     = (float)atof(args[5].c_str());
 		iplInst.quatRotation.x = (float)atof(args[6].c_str());
 		iplInst.quatRotation.y = (float)atof(args[7].c_str());
 		iplInst.quatRotation.z = (float)atof(args[8].c_str());
 		iplInst.quatRotation.w = (float)atof(args[9].c_str());
-		iplInst.lodIndex = atoi(args[10].c_str());
+		iplInst.lodIndex       = atoi(args[10].c_str());
 
 		const std::string& modelName = args[1];
 
@@ -748,15 +743,13 @@ static void HandleInstLine(const std::string& line)
 		// GTA3/VC map line.
 		streaming::ident_t modelID = atoi(args[0].c_str());
 		rw::V3d pos(
-			(float)atof(args[2].c_str()),
-			(float)atof(args[3].c_str()),
-			(float)atof(args[4].c_str())
-			);
+		    (float)atof(args[2].c_str()),
+		    (float)atof(args[3].c_str()),
+		    (float)atof(args[4].c_str()));
 		rw::V3d scale(
-			(float)atof(args[5].c_str()),
-			(float)atof(args[6].c_str()),
-			(float)atof(args[7].c_str())
-			);
+		    (float)atof(args[5].c_str()),
+		    (float)atof(args[6].c_str()),
+		    (float)atof(args[7].c_str()));
 		rw::Quat rotQuat;
 		rotQuat.x = (float)atof(args[8].c_str());
 		rotQuat.y = (float)atof(args[9].c_str());
@@ -764,25 +757,22 @@ static void HandleInstLine(const std::string& line)
 		rotQuat.w = (float)atof(args[11].c_str());
 
 		inst_sec_man.RegisterGTA3Instance(
-			modelID, 0,
-			pos, scale, rotQuat
-			);
+		    modelID, 0,
+		    pos, scale, rotQuat);
 	}
 	else if (args.size() == 13)
 	{
 		// Vice City map line.
 		streaming::ident_t modelID = atoi(args[0].c_str());
-		int areaCode = atoi(args[2].c_str());
+		int areaCode               = atoi(args[2].c_str());
 		rw::V3d pos(
-			(float)atof(args[3].c_str()),
-			(float)atof(args[4].c_str()),
-			(float)atof(args[5].c_str())
-			);
+		    (float)atof(args[3].c_str()),
+		    (float)atof(args[4].c_str()),
+		    (float)atof(args[5].c_str()));
 		rw::V3d scale(
-			(float)atof(args[6].c_str()),
-			(float)atof(args[7].c_str()),
-			(float)atof(args[8].c_str())
-			);
+		    (float)atof(args[6].c_str()),
+		    (float)atof(args[7].c_str()),
+		    (float)atof(args[8].c_str()));
 		rw::Quat rotQuat;
 		rotQuat.x = (float)atof(args[9].c_str());
 		rotQuat.y = (float)atof(args[10].c_str());
@@ -790,9 +780,8 @@ static void HandleInstLine(const std::string& line)
 		rotQuat.w = (float)atof(args[12].c_str());
 
 		inst_sec_man.RegisterGTA3Instance(
-			modelID, areaCode,
-			pos, scale, rotQuat
-			);
+		    modelID, areaCode,
+		    pos, scale, rotQuat);
 	}
 }
 
@@ -802,9 +791,8 @@ static void HandleInstEnd()
 }
 
 const static SectionDescriptor iplSections[] = {
-	{ "inst", HandleInstLine, HandleInstEnd },
-	{ nullptr, nullptr }
-};
+    {"inst", HandleInstLine, HandleInstEnd},
+    {nullptr, nullptr}};
 
 // Data file loaders!
 void FileLoader::LoadIPLFile(const std::string& absPath, const GameUniversePtr& universe)

@@ -6,7 +6,7 @@ namespace krt
 {
 class FileLoader
 {
-public:
+  public:
 	// loads an IDE/IPL file without assigning to any universe
 	inline static void LoadIDEFile(const std::string& absPath)
 	{
@@ -24,7 +24,7 @@ public:
 
 	static void ScanIMG(const vfs::DevicePtr& device, const std::string& pathPrefix, const GameUniversePtr& universe);
 
-private:
+  private:
 	// static class only
 	FileLoader();
 };

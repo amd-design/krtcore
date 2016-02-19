@@ -24,7 +24,7 @@ struct GameConfiguration
 // a game universe represents a single game's asset configuration
 class GameUniverse
 {
-public:
+  public:
 	GameUniverse(const GameConfiguration& configuration);
 
 	~GameUniverse();
@@ -47,7 +47,7 @@ public:
 
 	inline void RegisterModelIndexMapping(streaming::ident_t from, streaming::ident_t to)
 	{
-		m_modelIndexMapping.insert({ from, to });
+		m_modelIndexMapping.insert({from, to});
 	}
 
 	inline streaming::ident_t GetModelIndexMapping(streaming::ident_t localId)
@@ -59,12 +59,12 @@ public:
 		return it->second;
 	}
 
-private:
+  private:
 	void AddImage(const std::string& relativePath);
 
 	void LoadConfiguration(const std::string& relativePath);
 
-private:
+  private:
 	struct ImageFile
 	{
 		vfs::DevicePtr cdimage;
@@ -74,7 +74,7 @@ private:
 		std::string primaryMount;
 	};
 
-private:
+  private:
 	GameConfiguration m_configuration;
 
 	std::vector<ImageFile> m_imageFiles;

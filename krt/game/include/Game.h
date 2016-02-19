@@ -2,13 +2,13 @@
 
 // Game things go here!
 
-#define GAME_NUM_STREAMING_CHANNELS     4
+#define GAME_NUM_STREAMING_CHANNELS 4
 
 #include "vfs\Device.h"
 
+#include "ModelInfo.h"
 #include "Streaming.h"
 #include "TexDict.h"
-#include "ModelInfo.h"
 #include "World.h"
 
 #include "Console.Commands.h"
@@ -19,43 +19,44 @@ namespace krt
 
 class Game
 {
-    friend struct Entity;
-public:
-    Game( void );
-    ~Game( void );
+	friend struct Entity;
 
-    std::string GetGamePath( std::string relPath );
+  public:
+	Game(void);
+	~Game(void);
 
-    inline streaming::StreamMan& GetStreaming( void )           { return this->streaming; }
-    inline TextureManager& GetTextureManager( void )            { return this->texManager; }
-    inline ModelManager& GetModelManager( void )                { return this->modelManager; }
+	std::string GetGamePath(std::string relPath);
 
-    inline World* GetWorld( void )                              { return &theWorld; }
+	inline streaming::StreamMan& GetStreaming(void) { return this->streaming; }
+	inline TextureManager& GetTextureManager(void) { return this->texManager; }
+	inline ModelManager& GetModelManager(void) { return this->modelManager; }
 
-    std::string GetDevicePathPrefix( void )                     { return "gta3:/"; }
+	inline World* GetWorld(void) { return &theWorld; }
+
+	std::string GetDevicePathPrefix(void) { return "gta3:/"; }
 
 	GameUniversePtr AddUniverse(const GameConfiguration& configuration);
 
 	GameUniversePtr GetUniverse(const std::string& name);
 
-private:
-    std::string gameDir;
+  private:
+	std::string gameDir;
 
-    streaming::StreamMan streaming;
+	streaming::StreamMan streaming;
 
-    TextureManager texManager;
-    ModelManager modelManager;
+	TextureManager texManager;
+	ModelManager modelManager;
 
-    World theWorld;
+	World theWorld;
 
-    NestedList <Entity> activeEntities;
+	NestedList<Entity> activeEntities;
 
 	std::vector<GameUniversePtr> universes;
 };
 
-extern Game *theGame;
+extern Game* theGame;
 
-template<>
+template <>
 struct ConsoleArgumentType<GameUniversePtr>
 {
 	static bool Parse(const std::string& input, GameUniversePtr* out)
@@ -64,5 +65,4 @@ struct ConsoleArgumentType<GameUniversePtr>
 		return true;
 	}
 };
-
 };
