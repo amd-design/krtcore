@@ -24,7 +24,7 @@ class Game
 	friend struct Entity;
 
   public:
-	Game(void);
+	Game(const std::vector<std::pair<std::string, std::string>>& setList);
 	~Game(void);
 
 	void Run();

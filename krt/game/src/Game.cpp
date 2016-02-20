@@ -24,11 +24,9 @@ namespace krt
 
 Game* theGame = NULL;
 
-Game::Game(void) : streaming(GAME_NUM_STREAMING_CHANNELS), texManager(streaming), modelManager(streaming, texManager)
+Game::Game(const std::vector<std::pair<std::string, std::string>>& setList) : streaming(GAME_NUM_STREAMING_CHANNELS), texManager(streaming), modelManager(streaming, texManager)
 {
 	assert(theGame == NULL);
-
-	sys::InitializeConsole();
 
 	// Initialize console variables.
 	maxFPSVariable = std::make_unique<ConVar<int>>("maxFPS", ConVar_Archive, 60, &maxFPS);
@@ -48,6 +46,12 @@ Game::Game(void) : streaming(GAME_NUM_STREAMING_CHANNELS), texManager(streaming)
 
 	// run config.cfg
 	console::ExecuteSingleCommand(ProgramArguments{ "exec", "user:/config.cfg" });
+
+	// override variables from console
+	for (auto& pair : setList)
+	{
+		console::ExecuteSingleCommand(ProgramArguments{ "set", pair.first, pair.second });
+	}
 
 	// Detect where the game is installed.
 	// For now, I guess we do it manually.
