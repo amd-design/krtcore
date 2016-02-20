@@ -80,8 +80,30 @@ class ConsoleCommandManager
 };
 
 template <typename TArgument, typename TConstraint = void>
+struct ConsoleArgumentTraits
+{
+	using Less = std::less<TArgument>;
+	using Greater = std::greater<TArgument>;
+	using Equal = std::equal_to<TArgument>;
+};
+
+template <typename TArgument, typename TConstraint = void>
+struct ConsoleArgumentName
+{
+	inline static const char* Get()
+	{
+		return typeid(TArgument).name();
+	}
+};
+
+template <typename TArgument, typename TConstraint = void>
 struct ConsoleArgumentType
 {
+	static std::string Unparse(const TArgument& argument)
+	{
+		static_assert(false, "Unknown ConsoleArgumentType unparse handler (try defining one?)");
+	}
+
 	static bool Parse(const std::string& input, TArgument* out)
 	{
 		static_assert(false, "Unknown ConsoleArgumentType parse handler (try defining one?)");
@@ -91,6 +113,11 @@ struct ConsoleArgumentType
 template <>
 struct ConsoleArgumentType<std::string>
 {
+	static std::string Unparse(const std::string& input)
+	{
+		return input;
+	}
+
 	static bool Parse(const std::string& input, std::string* out)
 	{
 		*out = input;
@@ -98,9 +125,23 @@ struct ConsoleArgumentType<std::string>
 	}
 };
 
+template <>
+struct ConsoleArgumentName<std::string>
+{
+	inline static const char* Get()
+	{
+		return "string";
+	}
+};
+
 template <typename TArgument>
 struct ConsoleArgumentType<TArgument, std::enable_if_t<std::is_integral<TArgument>::value>>
 {
+	static std::string Unparse(const TArgument& input)
+	{
+		return std::to_string(input);
+	}
+
 	static bool Parse(const std::string& input, TArgument* out)
 	{
 		try
@@ -120,6 +161,11 @@ struct ConsoleArgumentType<TArgument, std::enable_if_t<std::is_integral<TArgumen
 template <typename TArgument>
 struct ConsoleArgumentType<TArgument, std::enable_if_t<std::is_floating_point<TArgument>::value>>
 {
+	static std::string Unparse(const TArgument& input)
+	{
+		return std::to_string(input);
+	}
+
 	static bool Parse(const std::string& input, TArgument* out)
 	{
 		try
@@ -141,6 +187,12 @@ template <typename TArgument>
 bool ParseArgument(const std::string& input, TArgument* out)
 {
 	return ConsoleArgumentType<TArgument>::Parse(input, out);
+}
+
+template <typename TArgument>
+std::string UnparseArgument(const TArgument& input)
+{
+	return ConsoleArgumentType<TArgument>::Unparse(input);
 }
 
 template <class TFunc>

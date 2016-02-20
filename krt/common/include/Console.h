@@ -5,6 +5,14 @@
 
 namespace krt
 {
+class ConsoleVariableManagerProxy
+{
+public:
+	virtual ~ConsoleVariableManagerProxy() = default;
+};
+
+class ConsoleVariableManager;
+
 namespace console
 {
 class Context
@@ -27,6 +35,11 @@ public:
 		return m_commandManager.get();
 	}
 
+	inline ConsoleVariableManager* GetVariableManager()
+	{
+		return (ConsoleVariableManager*)m_variableManager.get();
+	}
+
 	inline Context* GetFallbackContext()
 	{
 		return m_fallbackContext;
@@ -36,6 +49,8 @@ private:
 	Context* m_fallbackContext;
 
 	std::unique_ptr<ConsoleCommandManager> m_commandManager;
+
+	std::unique_ptr<ConsoleVariableManagerProxy> m_variableManager;
 
 	std::string m_commandBuffer;
 

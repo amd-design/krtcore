@@ -14,6 +14,8 @@
 #include "Console.Commands.h"
 #include "GameUniverse.h"
 
+#include "Console.VariableHelpers.h"
+
 namespace krt
 {
 
@@ -61,6 +63,15 @@ class Game
 	NestedList<Entity> activeEntities;
 
 	std::vector<GameUniversePtr> universes;
+
+	int maxFPS;
+
+	float timescale;
+
+  private:
+	std::unique_ptr<ConVar<int>> maxFPSVariable;
+
+	std::unique_ptr<ConVar<float>> timescaleVariable;
 };
 
 extern Game* theGame;

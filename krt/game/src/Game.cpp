@@ -28,6 +28,10 @@ Game::Game(void) : streaming(GAME_NUM_STREAMING_CHANNELS), texManager(streaming)
 {
 	assert(theGame == NULL);
 
+	// Initialize console variables.
+	maxFPSVariable = std::make_unique<ConVar<int>>("maxFPS", ConVar_Archive, 60, &maxFPS);
+	timescaleVariable = std::make_unique<ConVar<float>>("timescale", ConVar_None, 1.0f, &timescale);
+
 	// We can only have one game :)
 	theGame = this;
 
@@ -109,7 +113,7 @@ void Game::Run()
 	{
 		// limit frame rate and handle events
 		// TODO: non-busy wait?
-		int minMillis   = (1000 / 60); // 60 is to be replaced by a 'max fps' console value
+		int minMillis   = (1000 / this->maxFPS);
 		uint32_t millis = 0;
 
 		uint64_t thisTime = 0;
@@ -122,7 +126,7 @@ void Game::Run()
 		} while (millis < minMillis);
 
 		// handle time scaling
-		float scale = 1.0f; // to be replaced by a console value, again
+		float scale = this->timescale; // to be replaced by a console value, again
 		millis *= scale;
 
 		if (millis < 1)

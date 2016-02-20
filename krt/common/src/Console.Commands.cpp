@@ -52,37 +52,47 @@ void ConsoleCommandManager::Invoke(const std::string& commandString)
 
 void ConsoleCommandManager::Invoke(const std::string& commandName, const ProgramArguments& arguments)
 {
-	// lock the mutex
-	auto lock = shared_lock_acquire<std::shared_timed_mutex>(m_mutex);
+	std::vector<THandler> functionAttempts;
 
-	// acquire a list of command entries
-	auto entryPair = m_entries.equal_range(commandName);
-
-	if (entryPair.first == entryPair.second)
 	{
-		// try in the fallback context first
-		console::Context* fallbackContext = m_parentContext->GetFallbackContext();
+		// lock the mutex
+		auto lock = shared_lock_acquire<std::shared_timed_mutex>(m_mutex);
 
-		if (fallbackContext)
+		// acquire a list of command entries
+		auto entryPair = m_entries.equal_range(commandName);
+
+		if (entryPair.first == entryPair.second)
 		{
-			return fallbackContext->GetCommandManager()->Invoke(commandName, arguments);
+			// try in the fallback context first
+			console::Context* fallbackContext = m_parentContext->GetFallbackContext();
+
+			if (fallbackContext)
+			{
+				return fallbackContext->GetCommandManager()->Invoke(commandName, arguments);
+			}
+
+			// TODO: replace with console stream output
+			printf("No such command %s.\n", commandName.c_str());
+			return;
 		}
 
-		// TODO: replace with console stream output
-		printf("No such command %s.\n", commandName.c_str());
-		return;
+		// NOTE: to prevent recursive locking, we store the functions in a list first!
+		for (std::pair<const std::string, Entry>& entry : GetIteratorView(entryPair))
+		{
+			functionAttempts.push_back(entry.second.function);
+		}
 	}
 
 	// try executing overloads until finding one that accepts our arguments - if none is found, print the error buffer
 	ConsoleExecutionContext context(std::move(arguments));
 	bool result = false;
 
-	for (std::pair<const std::string, Entry>& entry : GetIteratorView(entryPair))
+	// clear the error buffer
+	for (auto& function : functionAttempts)
 	{
-		// clear the error buffer
 		context.errorBuffer.str("");
 
-		result = entry.second.function(context);
+		result = function(context);
 
 		if (result)
 		{

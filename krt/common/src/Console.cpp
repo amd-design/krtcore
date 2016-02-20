@@ -1,6 +1,7 @@
 #include <StdInc.h>
 #include <Console.h>
 #include <Console.Commands.h>
+#include <Console.Variables.h>
 
 #include <sstream>
 
@@ -18,6 +19,7 @@ Context::Context(Context* fallbackContext)
 	: m_fallbackContext(fallbackContext)
 {
 	m_commandManager = std::make_unique<ConsoleCommandManager>(this);
+	m_variableManager = std::make_unique<ConsoleVariableManager>(this);
 }
 
 void Context::ExecuteSingleCommand(const std::string& command)
