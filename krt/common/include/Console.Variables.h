@@ -31,13 +31,13 @@ struct Constraints<T, std::enable_if_t<std::is_arithmetic<T>::value>>
 	{
 		if (ConsoleArgumentTraits<T>::Greater()(value, maxValue))
 		{
-			printf("Value out of range (%s) - should be at most %s\n", UnparseArgument(value).c_str(), UnparseArgument(maxValue).c_str());
+			console::Printf("Value out of range (%s) - should be at most %s\n", UnparseArgument(value).c_str(), UnparseArgument(maxValue).c_str());
 			return false;
 		}
 
 		if (ConsoleArgumentTraits<T>::Less()(value, minValue))
 		{
-			printf("Value out of range (%s) - should be at least %s\n", UnparseArgument(value).c_str(), UnparseArgument(minValue).c_str());
+			console::Printf("Value out of range (%s) - should be at least %s\n", UnparseArgument(value).c_str(), UnparseArgument(minValue).c_str());
 			return false;
 		}
 
@@ -56,7 +56,7 @@ public:
 	{
 		m_getCommand = std::make_unique<ConsoleCommand>(manager->GetParentContext(), name, [=] ()
 		{
-			printf(" \"%s\" is \"%s\"\n default: \"%s\"\n type: %s\n", name.c_str(), GetValue().c_str(), UnparseArgument(m_defaultValue).c_str(), ConsoleArgumentName<T>::Get());
+			console::Printf(" \"%s\" is \"%s\"\n default: \"%s\"\n type: %s\n", name.c_str(), GetValue().c_str(), UnparseArgument(m_defaultValue).c_str(), ConsoleArgumentName<T>::Get());
 		});
 
 		m_setCommand = std::make_unique<ConsoleCommand>(manager->GetParentContext(), name, [=] (const T& newValue)

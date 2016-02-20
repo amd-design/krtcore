@@ -11,7 +11,7 @@ static ConsoleCommand execCommand("exec", [] (const std::string& path)
 
 	if (!stream)
 	{
-		printf("No such config file: %s\n", path.c_str());
+		console::Printf("No such config file: %s\n", path.c_str());
 		return;
 	}
 

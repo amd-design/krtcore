@@ -37,7 +37,7 @@ ConsoleVariableManager::ConsoleVariableManager(console::Context* parentContext)
 			}
 		}
 
-		int flags = ConVar_None;
+		int flags = ConVar_Modified;
 
 		if (archive)
 		{

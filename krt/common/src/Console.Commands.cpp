@@ -72,7 +72,7 @@ void ConsoleCommandManager::Invoke(const std::string& commandName, const Program
 			}
 
 			// TODO: replace with console stream output
-			printf("No such command %s.\n", commandName.c_str());
+			console::Printf("No such command %s.\n", commandName.c_str());
 			return;
 		}
 
@@ -102,7 +102,7 @@ void ConsoleCommandManager::Invoke(const std::string& commandName, const Program
 
 	if (!result)
 	{
-		printf("%s", context.errorBuffer.str().c_str());
+		console::Printf("%s", context.errorBuffer.str().c_str());
 	}
 }
 

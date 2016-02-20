@@ -9,6 +9,8 @@
 
 #include "CdImageDevice.h"
 
+#include <Console.VariableHelpers.h>
+
 namespace krt
 {
 static void make_lower(std::string& str)
@@ -56,8 +58,15 @@ inline std::string get_file_name(std::string path, std::string* extOut = NULL)
 	return std::string(fileNameStart, pathIter);
 }
 
+static bool g_fileloaderDebug;
+
 void FileLoader::ScanIMG(const vfs::DevicePtr& imgDevice, const std::string& pathPrefix, const GameUniversePtr& universe)
 {
+	if (g_fileloaderDebug)
+	{
+		console::Printf("Scanning CD image %s\n", pathPrefix.c_str());
+	}
+
 	// We now have to parse the contents of the IMG archive. :)
 	{
 		vfs::FindData findData;
@@ -471,6 +480,12 @@ void FileLoader::LoadIDEFile(const std::string& relPath, const GameUniversePtr& 
 	// set the universe we parse into
 	g_currentParseUniverse = universe;
 
+	// debug print
+	if (g_fileloaderDebug)
+	{
+		console::Printf("Loading IDE file %s into universe %s\n", relPath.c_str(), g_currentParseUniverse->GetConfiguration().gameName.c_str());
+	}
+
 	// load the section file
 	ProcessSectionedFile(ideSections, ideFile);
 
@@ -802,10 +817,18 @@ void FileLoader::LoadIPLFile(const std::string& absPath, const GameUniversePtr& 
 	// set the universe we parse into
 	g_currentParseUniverse = universe;
 
+	// debug print
+	if (g_fileloaderDebug)
+	{
+		console::Printf("Loading IPL file %s into universe %s\n", absPath.c_str(), g_currentParseUniverse->GetConfiguration().gameName.c_str());
+	}
+
 	// load the section file
 	ProcessSectionedFile(iplSections, iplFileData);
 
 	// unset the universe
 	g_currentParseUniverse.reset();
 }
+
+static ConVar<bool> g_fileloaderDebugVar("fileLoader_debug", ConVar_Archive, false, &g_fileloaderDebug);
 }

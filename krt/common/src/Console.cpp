@@ -158,6 +158,8 @@ void Context::SaveConfigurationIfNeeded(const std::string& path)
 
 	if (numModifiedVars > 0)
 	{
+		console::DPrintf("Saving ^1c^2o^3n^4f^5i^6g^7uration to %s...\n", path.c_str());
+
 		SaveConfiguration(path, GetVariableManager());
 
 		wasSavedBefore = true;

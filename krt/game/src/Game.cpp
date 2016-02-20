@@ -28,6 +28,8 @@ Game::Game(void) : streaming(GAME_NUM_STREAMING_CHANNELS), texManager(streaming)
 {
 	assert(theGame == NULL);
 
+	sys::InitializeConsole();
+
 	// Initialize console variables.
 	maxFPSVariable = std::make_unique<ConVar<int>>("maxFPS", ConVar_Archive, 60, &maxFPS);
 	timescaleVariable = std::make_unique<ConVar<float>>("timescale", ConVar_None, 1.0f, &timescale);
@@ -147,7 +149,7 @@ void Game::Run()
 
 		if (millis > 500)
 		{
-			printf("long frame: %d millis\n", millis);
+			console::Printf("long frame: %d millis\n", millis);
 		}
 
 		// store timing values for this frame

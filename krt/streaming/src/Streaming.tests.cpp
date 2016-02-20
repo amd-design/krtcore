@@ -37,9 +37,7 @@ static std::mutex safety_lock;
 
 static void DebugMessage(const std::string& msg)
 {
-	std::unique_lock<std::mutex> msgLock;
-
-	std::cout << msg << std::endl;
+	console::Printf("%s\n", msg.c_str());
 }
 
 class TestInterface : public streaming::StreamingTypeInterface

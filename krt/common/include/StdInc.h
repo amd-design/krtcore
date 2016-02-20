@@ -33,3 +33,5 @@
 
 #include <rw.h>
 #include <RwHelpers.h>
+
+#include <Console.Base.h>
