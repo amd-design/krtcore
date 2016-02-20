@@ -85,6 +85,13 @@ struct ConsoleArgumentType<GameUniversePtr>
 	static bool Parse(const std::string& input, GameUniversePtr* out)
 	{
 		*out = theGame->GetUniverse(input);
+
+		// fail to parse if there's no such universe
+		if (!*out)
+		{
+			return false;
+		}
+
 		return true;
 	}
 };
