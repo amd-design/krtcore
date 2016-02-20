@@ -41,6 +41,12 @@ Game::Game(void) : streaming(GAME_NUM_STREAMING_CHANNELS), texManager(streaming)
 
 	gta::attachPlugins();
 
+	// mount the user directory
+	MountUserDirectory();
+
+	// run config.cfg
+	console::ExecuteSingleCommand(ProgramArguments{ "exec", "user:/config.cfg" });
+
 	// Detect where the game is installed.
 	// For now, I guess we do it manually.
 
@@ -152,6 +158,9 @@ void Game::Run()
 
 		// execute the command buffer for the global console
 		console::ExecuteBuffer();
+
+		// try saving changed console variables
+		console::SaveConfigurationIfNeeded("user:/config.cfg");
 
 		// whatever else might come to mind
 	}

@@ -45,6 +45,8 @@ struct Constraints<T, std::enable_if_t<std::is_arithmetic<T>::value>>
 	}
 };
 
+void MarkConsoleVarModified(ConsoleVariableManager* manager, const std::string& name);
+
 template<typename T>
 class ConsoleVariableEntry : public ConsoleVariableEntryBase
 {
@@ -119,6 +121,13 @@ public:
 			return false;
 		}
 
+		// update modified flags if changed
+		if (!ConsoleArgumentTraits<T>::Equal()(m_curValue, newValue))
+		{
+			// indirection as manager isn't declared by now
+			MarkConsoleVarModified(m_manager, m_name);
+		}
+
 		m_curValue = newValue;
 
 		if (m_trackingVar)
@@ -153,14 +162,18 @@ private:
 enum ConsoleVariableFlags
 {
 	ConVar_None = 0,
-	ConVar_Archive = 0x1
-	
+	ConVar_Archive = 0x1,
+	ConVar_Modified = 2
 };
 
 class ConsoleVariableManager : public ConsoleVariableManagerProxy
 {
 public:
 	using THandlerPtr = std::shared_ptr<internal::ConsoleVariableEntryBase>;
+
+	using TVariableCB = std::function<void(const std::string& name, int flags, const THandlerPtr& variable)>;
+
+	using TWriteLineCB = std::function<void(const std::string& line)>;
 
 public:
 	ConsoleVariableManager(console::Context* context);
@@ -174,6 +187,14 @@ public:
 	bool Process(const std::string& commandName, const ProgramArguments& arguments);
 
 	THandlerPtr FindEntryRaw(const std::string& name);
+	
+	void AddEntryFlags(const std::string& name, int flags);
+
+	void RemoveEntryFlags(const std::string& name, int flags);
+
+	void ForAllVariables(const TVariableCB& callback, int flagMask = 0xFFFFFFFF);
+
+	void SaveConfiguration(const TWriteLineCB& writeLineFunction);
 
 	inline console::Context* GetParentContext()
 	{

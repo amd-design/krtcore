@@ -48,6 +48,9 @@ class Game
 	GameUniversePtr GetUniverse(const std::string& name);
 
   private:
+	void MountUserDirectory();
+
+  private:
 	float dT;
 	uint32_t lastFrameTime;
 

@@ -30,6 +30,8 @@ public:
 
 	void ExecuteBuffer();
 
+	void SaveConfigurationIfNeeded(const std::string& path);
+
 	inline ConsoleCommandManager* GetCommandManager()
 	{
 		return m_commandManager.get();
@@ -68,5 +70,7 @@ ProgramArguments Tokenize(const std::string& line);
 void AddToBuffer(const std::string& text);
 
 void ExecuteBuffer();
+
+void SaveConfigurationIfNeeded(const std::string& path);
 }
 }

@@ -11,17 +11,26 @@ ConsoleVariableManager::ConsoleVariableManager(console::Context* parentContext)
 	{
 		// weird order is to prevent recursive locking
 		{
-			auto lock = shared_lock_acquire<std::shared_timed_mutex>(m_mutex);
+			Entry* entry = nullptr;
 
-			auto oldVariable = m_entries.find(variable);
-
-			if (oldVariable != m_entries.end())
 			{
-				oldVariable->second.variable->SetValue(value);
+				auto lock = shared_lock_acquire<std::shared_timed_mutex>(m_mutex);
+
+				auto oldVariable = m_entries.find(variable);
+
+				if (oldVariable != m_entries.end())
+				{
+					entry = &oldVariable->second;
+				}
+			}
+
+			if (entry)
+			{
+				entry->variable->SetValue(value);
 
 				if (archive)
 				{
-					oldVariable->second.flags |= ConVar_Archive;
+					entry->flags |= ConVar_Archive;
 				}
 
 				return;
@@ -97,6 +106,63 @@ void ConsoleVariableManager::Unregister(int token)
 	}
 }
 
+void ConsoleVariableManager::AddEntryFlags(const std::string& name, int flags)
+{
+	auto lock = exclusive_lock_acquire<std::shared_timed_mutex>(m_mutex);
+
+	auto it = m_entries.find(name);
+
+	if (it != m_entries.end())
+	{
+		it->second.flags |= flags;
+	}
+}
+
+void ConsoleVariableManager::RemoveEntryFlags(const std::string& name, int flags)
+{
+	auto lock = exclusive_lock_acquire<std::shared_timed_mutex>(m_mutex);
+
+	auto it = m_entries.find(name);
+
+	if (it != m_entries.end())
+	{
+		it->second.flags &= ~(flags);
+	}
+}
+
+void ConsoleVariableManager::ForAllVariables(const TVariableCB& callback, int flagMask)
+{
+	// store first so we don't have to deal with recursive locks
+	std::vector<std::tuple<std::string, int, THandlerPtr>> iterationList;
+
+	{
+		auto lock = exclusive_lock_acquire<std::shared_timed_mutex>(m_mutex);
+
+		for (auto& entry : m_entries)
+		{
+			// if flags match the mask
+			if ((entry.second.flags & flagMask) != 0)
+			{
+				iterationList.push_back(std::make_tuple(entry.second.name, entry.second.flags, entry.second.variable));
+			}
+		}
+	}
+
+	// and call the iterator with each tuple
+	for (const auto& entry : iterationList)
+	{
+		apply(callback, entry);
+	}
+}
+
+void ConsoleVariableManager::SaveConfiguration(const TWriteLineCB& writeLineFunction)
+{
+	ForAllVariables([&] (const std::string& name, int flags, const THandlerPtr& variable)
+	{
+		writeLineFunction("seta \"" + name + "\" \"" + variable->GetValue() + "\"");
+	}, ConVar_Archive);
+}
+
 bool ConsoleVariableManager::Process(const std::string& commandName, const ProgramArguments& arguments)
 {
 	// we currently don't process any variables specifically
@@ -106,5 +172,13 @@ bool ConsoleVariableManager::Process(const std::string& commandName, const Progr
 ConsoleVariableManager* ConsoleVariableManager::GetDefaultInstance()
 {
 	return console::GetDefaultContext()->GetVariableManager();
+}
+
+namespace internal
+{
+void MarkConsoleVarModified(ConsoleVariableManager* manager, const std::string& name)
+{
+	manager->AddEntryFlags(name, ConVar_Modified);
+}
 }
 }
