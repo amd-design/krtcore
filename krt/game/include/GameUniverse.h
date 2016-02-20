@@ -82,6 +82,8 @@ class GameUniverse
 	std::vector<streaming::ident_t> m_streamingIndices;
 
 	std::map<streaming::ident_t, streaming::ident_t> m_modelIndexMapping;
+
+	Game* m_game;
 };
 
 using GameUniversePtr = std::shared_ptr<GameUniverse>;

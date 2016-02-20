@@ -117,6 +117,12 @@ void Game::Run()
 	bool wantsToExit  = false;
 	uint64_t lastTime = 0;
 
+	// exit command
+	ConsoleCommand quitCommand("quit", [&] ()
+	{
+		wantsToExit = true;
+	});
+
 	while (!wantsToExit)
 	{
 		// limit frame rate and handle events

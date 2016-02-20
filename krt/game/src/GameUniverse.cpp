@@ -14,7 +14,7 @@
 namespace krt
 {
 GameUniverse::GameUniverse(const GameConfiguration& configuration)
-    : m_configuration(configuration)
+    : m_configuration(configuration), m_game(theGame)
 {
 }
 
@@ -22,7 +22,7 @@ GameUniverse::~GameUniverse()
 {
 	for (streaming::ident_t index : m_streamingIndices)
 	{
-		theGame->GetStreaming().UnlinkResource(index);
+		m_game->GetStreaming().UnlinkResource(index);
 	}
 }
 
