@@ -16,6 +16,11 @@ ModelManager::ModelManager( streaming::StreamMan& streaming, TextureManager& tex
     assert( didRegister == true );
 
     this->models.resize( MAX_MODELS );
+
+	this->loadAllModelsCommand = std::make_unique<ConsoleCommand>("load_all_models", [=] ()
+	{
+		this->LoadAllModels();
+	});
 }
 
 ModelManager::~ModelManager( void )
@@ -210,9 +215,6 @@ void ModelManager::LoadAllModels( void )
             streaming.Request( model->id );
         }
     }
-
-    // Wait for things to finish ;)
-    streaming.LoadingBarrier();
 }
 
 rw::Object* ModelManager::ModelResource::CloneModel( void )

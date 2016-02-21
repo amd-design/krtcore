@@ -6,6 +6,8 @@
 
 #include "TexDict.h"
 
+#include <Console.CommandHelpers.h>
+
 #define MODEL_ID_BASE   0
 #define MAX_MODELS      20000
 
@@ -95,6 +97,8 @@ private:
 
     std::map <std::string, ModelResource*> basifierLookup;
     std::map <std::string, ModelResource*> lodifierLookup;
+
+	std::unique_ptr<ConsoleCommand> loadAllModelsCommand;
 };
 
 }
