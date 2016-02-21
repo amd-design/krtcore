@@ -206,6 +206,11 @@ void SaveConfigurationIfNeeded(const std::string& path)
 	return GetDefaultContext()->SaveConfigurationIfNeeded(path);
 }
 
+static inline bool IsEscapeChar(char c)
+{
+	return (c == '"');
+}
+
 ProgramArguments Tokenize(const std::string& line)
 {
 	int i = 0;
@@ -287,7 +292,7 @@ ProgramArguments Tokenize(const std::string& line)
 					break;
 				}
 
-				if (line[i] == '\\')
+				if (line[i] == '\\' && IsEscapeChar(line[i + 1]))
 				{
 					inEscape = true;
 				}
