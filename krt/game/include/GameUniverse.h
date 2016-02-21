@@ -21,6 +21,8 @@ struct GameConfiguration
 	std::vector<std::string> imageFiles;
 };
 
+class Game;
+
 // a game universe represents a single game's asset configuration
 class GameUniverse
 {
