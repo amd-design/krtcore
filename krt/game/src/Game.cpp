@@ -101,7 +101,7 @@ void Game::Run()
 	{
 		// limit frame rate and handle events
 		// TODO: non-busy wait?
-		int minMillis   = (1000 / this->maxFPS);
+		int minMillis   = (this->maxFPS > 0) ? (1000 / this->maxFPS) : 1;
 		uint32_t millis = 0;
 
 		uint64_t thisTime = 0;
