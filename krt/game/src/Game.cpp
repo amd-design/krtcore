@@ -32,6 +32,10 @@ Game::Game(const std::vector<std::pair<std::string, std::string>>& setList) : st
 	maxFPSVariable = std::make_unique<ConVar<int>>("maxFPS", ConVar_Archive, 60, &maxFPS);
 	timescaleVariable = std::make_unique<ConVar<float>>("timescale", ConVar_None, 1.0f, &timescale);
 
+	// Console variables for loading the default game universe.
+	gameVariable = std::make_unique<ConVar<std::string>>("gameName", ConVar_Archive, "gta3");
+	gamePathVariable = std::make_unique<ConVar<std::string>>("gamePath", ConVar_Archive, "");
+
 	// We can only have one game :)
 	theGame = this;
 
@@ -53,42 +57,8 @@ Game::Game(const std::vector<std::pair<std::string, std::string>>& setList) : st
 		console::ExecuteSingleCommand(ProgramArguments{ "set", pair.first, pair.second });
 	}
 
-	// Detect where the game is installed.
-	// For now, I guess we do it manually.
-
-	const char* computerName = getenv("COMPUTERNAME");
-
-	if (stricmp(computerName, "FALLARBOR") == 0)
-	{
-		// Bas' thing.
-		//this->gameDir = "S:\\Games\\CleanSA\\GTA San Andreas\\";
-		this->gameDir = "S:\\Games\\Steam\\steamapps\\common\\Grand Theft Auto 3\\";
-	}
-	else if (stricmp(computerName, "DESKTOP") == 0)
-	{
-		// Martin's thing.
-		this->gameDir = "D:\\gtaiso\\unpack\\gta3\\";
-	}
-	else
-	{
-		// Add your own, meow.
-	}
-
 	// Set up game related things.
 	LIST_CLEAR(this->activeEntities.root);
-
-	// Create the game universe.
-	GameConfiguration configuration;
-	configuration.gameName = "gta3";
-	configuration.rootPath = gameDir;
-
-	configuration.imageFiles.push_back("models/gta3.img");
-	configuration.imageFiles.push_back("models/gta_int.img");
-
-	configuration.configurationFiles.push_back("data/gta3.dat");
-
-	GameUniversePtr universe = AddUniverse(configuration);
-	universe->Load();
 
 	// Do a test that loads all game models.
 	//modelManager.LoadAllModels();
@@ -174,8 +144,72 @@ void Game::Run()
 		// try saving changed console variables
 		console::SaveConfigurationIfNeeded("user:/config.cfg");
 
+		// load the game universe if variables are valid
+		LoadUniverseIfAvailable();
+
 		// whatever else might come to mind
 	}
+}
+
+void Game::LoadUniverseIfAvailable()
+{
+	// exit if we already have an universe
+	if (this->universes.size() > 0)
+	{
+		return;
+	}
+
+	// store variables
+	std::string gameName = this->gameVariable->GetValue();
+	std::string gamePath = this->gamePathVariable->GetValue() + "/";
+	std::string configFile = "data/gta.dat";
+
+	if (gameName == "gta3")
+	{
+		configFile = "data/gta3.dat";
+	}
+	else if (gameName == "gtavc")
+	{
+		configFile = "data/gta_vc.dat";
+	}
+
+	// is the variable even set?
+	if (gamePath == "/")
+	{
+		return;
+	}
+
+	// verify the game directory existing
+	{
+		vfs::StreamPtr stream = vfs::OpenRead(gamePath + configFile);
+
+		if (!stream)
+		{
+			// reset the game path
+			this->gamePathVariable->GetHelper()->SetRawValue("");
+
+			// print a warning
+			console::PrintWarning("Invalid %s game path: %s\n", gameName.c_str(), gamePath.c_str());
+
+			return;
+		}
+	}
+
+	// set game directory
+	gameDir = gamePath;
+
+	// create the game universe
+	GameConfiguration configuration;
+	configuration.gameName = gameName;
+	configuration.rootPath = gameDir;
+
+	configuration.imageFiles.push_back("models/gta3.img");
+	configuration.imageFiles.push_back("models/gta_int.img");
+
+	configuration.configurationFiles.push_back(configFile);
+
+	GameUniversePtr universe = AddUniverse(configuration);
+	universe->Load();
 }
 
 GameUniversePtr Game::AddUniverse(const GameConfiguration& configuration)

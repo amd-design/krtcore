@@ -50,6 +50,8 @@ class Game
   private:
 	void MountUserDirectory();
 
+	void LoadUniverseIfAvailable();
+
   private:
 	float dT;
 	uint32_t lastFrameTime;
@@ -75,6 +77,10 @@ class Game
 	std::unique_ptr<ConVar<int>> maxFPSVariable;
 
 	std::unique_ptr<ConVar<float>> timescaleVariable;
+
+	std::unique_ptr<ConVar<std::string>> gameVariable;
+
+	std::unique_ptr<ConVar<std::string>> gamePathVariable;
 };
 
 extern Game* theGame;
