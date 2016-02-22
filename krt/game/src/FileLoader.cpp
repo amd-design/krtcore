@@ -11,6 +11,8 @@
 
 #include <Console.VariableHelpers.h>
 
+#pragma warning(disable:4996)
+
 namespace krt
 {
 static void make_lower(std::string& str)

@@ -6,6 +6,420 @@ namespace krt
 namespace math
 {
 
+inline float ivec( const rw::V3d v, int idx )
+{
+    if ( idx == 1 )
+    {
+        return v.x;
+    }
+    else if ( idx == 2 )
+    {
+        return v.y;
+    }
+    else if ( idx == 3 )
+    {
+        return v.z;
+    }
+
+    return 0.0f;
+}
+
+// SPECIAL PLANE EQUATION SOLUTIONS.
+// GTFO IF YOU DONT KNOW WHAT YOU ARE DOING M8.
+typedef double p_resolve_t;
+
+// Helper math.
+MATH_INLINE p_resolve_t block_trans( const rw::V3d& t, const rw::V3d& b, int idxPrim, int idxSec )
+{
+    return ivec( t, idxPrim ) / ivec( b, idxPrim ) - ivec( t, idxPrim ) / ivec( b, idxSec );
+}
+
+// The most general solution, kinda. Could also say most complicated.
+inline bool plane_solution_fetcht_type_a(
+    const rw::V3d& u, const rw::V3d& z, const rw::V3d& o,
+    const rw::V3d& x, const rw::V3d& y, const rw::V3d& p,
+    p_resolve_t b, p_resolve_t& result
+)
+{
+    // Check this shit beforehand.
+    assert( ivec( x, 1 ) != 0 && ivec( x, 2 ) != 0 && ivec( x, 3 ) != 0 );
+
+    p_resolve_t mod_point_yx12 = block_trans( y, x, 1, 2 );
+    p_resolve_t mod_point_yx32 = block_trans( y, x, 3, 2 );
+
+    p_resolve_t mod_point_yx12_yx32_diff = ( mod_point_yx12 - mod_point_yx32 ); // MUST NOT BE ZERO.
+
+    p_resolve_t mod_point_ux12 = block_trans( u, x, 1, 2 ); // MUST NOT BE ZERO
+    p_resolve_t mod_point_ux32 = block_trans( u, x, 3, 2 ); // MUST NOT BE ZERO
+
+    if ( mod_point_yx12_yx32_diff != 0 && mod_point_ux12 != 0 && mod_point_ux32 != 0 )
+    {
+        p_resolve_t t =
+            (
+                b * ( block_trans( z, x, 1, 2 ) / mod_point_ux12 - block_trans( z, x, 3, 2 ) / mod_point_ux32 )
+                +
+                (
+                    ( block_trans( o, x, 1, 2 ) - block_trans( p, x, 1, 2 ) ) / mod_point_ux12
+                    -
+                    ( block_trans( o, x, 3, 2 ) - block_trans( p, x, 3, 2 ) ) / mod_point_ux32
+                )
+            )
+            / mod_point_yx12_yx32_diff;
+
+        result = t;
+        return true;
+    }
+
+    p_resolve_t mod_point_yx13 = block_trans( y, x, 1, 3 );
+    
+    p_resolve_t mod_point_yx12_yx13_diff = ( mod_point_yx12 - mod_point_yx13 ); // MUST NOT BE ZERO
+
+    p_resolve_t mod_point_ux13 = block_trans( u, x, 1, 3 ); // MUST NOT BE ZERO
+
+    if ( mod_point_yx12_yx13_diff != 0 && mod_point_ux12 != 0 && mod_point_ux13 != 0 )
+    {
+        p_resolve_t t =
+            (
+                b * ( block_trans( z, x, 1, 2 ) / mod_point_ux12 - block_trans( z, x, 1, 3 ) / mod_point_ux13 )
+                +
+                (
+                    ( block_trans( o, x, 1, 2 ) - block_trans( p, x, 1, 2 ) ) / mod_point_ux12
+                    -
+                    ( block_trans( o, x, 1, 3 ) - block_trans( p, x, 1, 3 ) ) / mod_point_ux13
+                )
+            )
+            / mod_point_yx12_yx13_diff;
+
+        result = t;
+        return true;
+    }
+
+    p_resolve_t mod_point_yx32_yx13_diff = ( mod_point_yx32 - mod_point_yx13 );
+
+    if ( mod_point_yx32_yx13_diff != 0 && mod_point_ux32 != 0 && mod_point_ux13 != 0 )
+    {
+        p_resolve_t t =
+            (
+                b * ( block_trans( z, x, 3, 2 ) / mod_point_ux32 - block_trans( z, x, 1, 3 ) / mod_point_ux13 )
+                +
+                (
+                    ( block_trans( o, x, 3, 2 ) - block_trans( p, x, 3, 2 ) ) / mod_point_ux32
+                    -
+                    ( block_trans( o, x, 1, 3 ) - block_trans( p, x, 1, 3 ) ) / mod_point_ux13
+                )
+            )
+            / mod_point_yx32_yx13_diff;
+
+        result = t;
+        return true;
+    }
+
+    // No solution :(
+    // At least for this type of equation.
+    return false;
+}
+
+// A sort of less complicated solution, but still coolios.
+inline bool plane_solution_fetcht_type_b(
+    const rw::V3d& u, const rw::V3d& z, const rw::V3d& o,
+    const rw::V3d& x, const rw::V3d& y, const rw::V3d& p,
+    p_resolve_t b, p_resolve_t& result,
+    int datIndex
+)
+{
+    assert( ivec( x, datIndex ) == 0 );
+
+    // Figure out the valid permutation to use, meow.
+    // Unlike the hyper complex solution type_a, we only have one possible equation, meow.
+    int prim_divide = ( ( datIndex == 1 ) ? 2 : 1 );
+    int sec_divide = ( ( datIndex == 3 ) ? 2 : 3 );
+
+    // But the question is: what is the friggin solution equation actually?
+    // Here is the answer! Lets search.
+
+    if ( ivec( x, prim_divide ) != 0 && ivec( x, sec_divide ) != 0 )
+    {
+        if ( ivec( u, datIndex != 0 ) )
+        {
+            // We got a solution, probably.
+            p_resolve_t mod_point_ux = block_trans( u, x, prim_divide, sec_divide );
+
+            if ( mod_point_ux != 0 )
+            {
+                p_resolve_t major_divisor = ( ivec( y, datIndex ) / ivec( u, datIndex ) - block_trans( y, x, prim_divide, sec_divide ) );
+
+                if ( major_divisor != 0 )
+                {
+                    // Alright, we should have a solution here.
+                    p_resolve_t t =
+                        (
+                            b * ( ivec( z, datIndex ) / ivec( u, datIndex ) - block_trans( z, x, prim_divide, sec_divide ) )
+                            +
+                            (
+                                ( ivec( o, datIndex ) - ivec( p, datIndex ) ) / ivec( u, datIndex )
+                                -
+                                (
+                                    ( ivec( o, prim_divide ) - ivec( p, prim_divide ) ) / ivec( x, prim_divide )
+                                    -
+                                    ( ivec( o, sec_divide ) - ivec( p, sec_divide ) ) / ivec( x, sec_divide )
+                                )
+                                /
+                                mod_point_ux
+                            )
+                        ) / major_divisor;
+
+                    result = t;
+                    return true;
+                }
+            }
+
+            // Welp, we have no solution yet.
+            // We kinda should search further.
+
+            if ( ivec( u, prim_divide ) == 0 || ivec( u, sec_divide ) == 0 )
+            {
+                p_resolve_t modulator;
+                bool hasModulator = false;
+
+                if ( ivec( u, prim_divide ) == 0 && ivec( x, sec_divide ) != 0 )
+                {
+                    modulator = -ivec( u, sec_divide ) / ivec( x, sec_divide );
+
+                    hasModulator = true;
+                }
+                else if ( ivec( u, sec_divide ) == 0 && ivec( x, prim_divide ) != 0 )
+                {
+                    modulator = ivec( u, prim_divide ) / ivec( x, prim_divide );
+
+                    hasModulator = true;
+                }
+
+                if ( hasModulator && modulator != 0 )
+                {
+                    // Maybe we have a solution here? We cannot say yet.
+                    p_resolve_t major_divisor = ( ivec( y, datIndex ) / ivec( u, datIndex ) - block_trans( y, x, prim_divide, sec_divide ) / modulator );
+
+                    if ( major_divisor != 0 )
+                    {
+                        // We got a winner!
+                        p_resolve_t t =
+                            (
+                                b * ( ivec( z, datIndex ) / ivec( u, datIndex ) - block_trans( z, x, prim_divide, sec_divide ) / modulator )
+                                +
+                                (
+                                    ( ivec( o, datIndex ) - ivec( p, datIndex ) ) / ivec( u, datIndex )
+                                    -
+                                    (
+                                        ( ivec( o, prim_divide ) - ivec( p, prim_divide ) ) / ivec( x, prim_divide )
+                                        -
+                                        ( ivec( o, sec_divide ) - ivec( p, sec_divide ) ) / ivec( x, sec_divide )
+                                    )
+                                ) / modulator
+                            ) / major_divisor;
+
+                        result = t;
+                        return true;
+                    }
+                }
+            }
+
+            // There are still more possibilities, m8!
+
+            if ( ivec( u, prim_divide ) == 0 && ivec( u, sec_divide ) == 0 )
+            {
+                // We could have an easy solution here.
+                // But not always!
+                p_resolve_t divisor = block_trans( y, x, prim_divide, sec_divide );
+
+                if ( divisor != 0 )
+                {
+                    // Easy fish.
+                    p_resolve_t t =
+                        (
+                            b * block_trans( z, x, prim_divide, sec_divide )
+                            +
+                            (
+                                ( ivec( o, prim_divide ) - ivec( p, prim_divide ) ) / ivec( x, prim_divide )
+                                -
+                                ( ivec( o, sec_divide ) - ivec( p, sec_divide ) ) / ivec( x, sec_divide )
+                            )
+                        ) / divisor;
+
+                    result = t;
+                    return true;
+                }
+            }
+        }
+    }
+
+    // And even more...
+
+    if ( ivec( y, datIndex ) != 0 )
+    {
+        // Pretty cool little solution right here.
+        p_resolve_t t = ( b * ivec( z, datIndex ) + ivec( o, datIndex ) - ivec( p, datIndex ) ) / ivec( y, datIndex );
+
+        result = t;
+        return true;
+    }
+
+    // No result.
+    return false;
+}
+
+// The cutest solution yet.
+inline bool plane_solution_fetcht_type_c(
+    const rw::V3d& u, const rw::V3d& z, const rw::V3d& o,
+    const rw::V3d& x, const rw::V3d& y, const rw::V3d& p,
+    p_resolve_t b, p_resolve_t& result,
+    int prim_idx, int sec_idx
+)
+{
+    assert( ivec( x, prim_idx == 0 ) && ivec( x, sec_idx ) == 0 );
+
+    // It ain't that hard even, meow.
+    p_resolve_t divisor = block_trans( y, u, prim_idx, sec_idx );
+
+    if ( divisor )
+    {
+        p_resolve_t t =
+            (
+                b * block_trans( z, u, prim_idx, sec_idx )
+                +
+                (
+                    ( ivec( o, prim_idx ) - ivec( p, prim_idx ) ) / ivec( u, prim_idx )
+                    -
+                    ( ivec( o, sec_idx ) - ivec( p, sec_idx ) ) / ivec( u, sec_idx )
+                )
+            ) / divisor;
+
+        result = t;
+        return true;
+    }
+
+    return false;
+}
+
+bool Plane::intersectWith( const Plane& right ) const
+{
+    // Try some shitty math.
+    // I hope I got all cases of plane-plane intersection figured out.
+
+    // Legend: x is vector a of this, s is scalar
+    //         y is vector b of this, t is scalar
+    //         u is vector a of right, a is scalar
+    //         z is vector b of right, b is scalar
+    //         p is position of this
+    //         o is position of right
+
+    rw::V3d x = this->a;
+    rw::V3d y = this->b;
+    rw::V3d u = right.a;
+    rw::V3d z = right.b;
+    rw::V3d p = this->pos;
+    rw::V3d o = right.pos;
+
+    bool hasIntersection = false;
+
+    // Check all possible cases.
+    // We first do get the value of t depending on b.
+    // Then we resolve s depending on t, resolve a depending on b.
+    p_resolve_t t0, t1;
+    bool hasSolution = false;   // true if we found a solution for t based on b.
+    {
+        p_resolve_t b = 1;
+
+        // Specialized math.
+        if ( ivec( x, 1 ) != 0 && ivec( x, 2 ) != 0 && ivec( x, 3 ) != 0 )
+        {
+            if ( plane_solution_fetcht_type_a( u, z, o, x, y, p, 0, t0 ) &&
+                 plane_solution_fetcht_type_a( u, z, o, x, y, p, 1, t1 ) )
+            {
+                hasSolution = true;
+            }
+        }
+
+        if ( !hasSolution )
+        {
+            // Always search further if no solution has been found yet.
+
+            if ( ivec( x, 1 ) == 0 )
+            {
+                if ( plane_solution_fetcht_type_b( u, z, o, x, y, p, 0, t0, 1 ) &&
+                     plane_solution_fetcht_type_b( u, z, o, x, y, p, 1, t1, 1 ) )
+                {
+                    hasSolution = true;
+                }
+                // TODO: check special solution.
+            }
+            
+            if ( !hasSolution )
+            {
+                if ( ivec( x, 2 ) == 0 )
+                {
+                    if ( plane_solution_fetcht_type_b( u, z, o, x, y, p, 0, t0, 2 ) &&
+                         plane_solution_fetcht_type_b( u, z, o, x, y, p, 1, t1, 2 ) )
+                    {
+                        hasSolution = true;
+                    }
+                    // TODO: check special solution.
+                }
+            
+                if ( !hasSolution )
+                {
+                    if ( ivec( x, 3 ) == 0 )
+                    {
+                        if ( plane_solution_fetcht_type_b( u, z, o, x, y, p, 0, t0, 3 ) &&
+                             plane_solution_fetcht_type_b( u, z, o, x, y, p, 1, t1, 3 ) )
+                        {
+                            hasSolution = true;
+                        }
+                        // TODO: check special solution.
+                    }
+
+                    // Now check for solutions if two coordinates are zero.
+                    if ( ivec( x, 1 ) == 0 && ivec( x, 2 ) == 0 )
+                    {
+                        if ( plane_solution_fetcht_type_c( u, z, o, x, y, p, 0, t0, 1, 2 ) &&
+                             plane_solution_fetcht_type_c( u, z, o, x, y, p, 1, t1, 1, 2 ) )
+                        {
+                            hasSolution = true;
+                        }
+                    }
+                    else if ( ivec( x, 2 ) == 0 && ivec( x, 3 ) == 0 )
+                    {
+                        if ( plane_solution_fetcht_type_c( u, z, o, x, y, p, 0, t0, 2, 3 ) &&
+                             plane_solution_fetcht_type_c( u, z, o, x, y, p, 1, t1, 2, 3 ) )
+                        {
+                            hasSolution = true;
+                        }
+                    }
+                    else if ( ivec( x, 1 ) == 0 && ivec( x, 3 ) == 0 )
+                    {
+                        if ( plane_solution_fetcht_type_c( u, z, o, x, y, p, 0, t0, 1, 3 ) &&
+                             plane_solution_fetcht_type_c( u, z, o, x, y, p, 1, t1, 1, 3 ) )
+                        {
+                            hasSolution = true;
+                        }
+                    }
+
+                    // There are no more solutions, meow.
+                }
+            }
+        }
+    }
+
+    // Do we have a generic intersection based on dependency by b ?
+    if ( hasSolution )
+    {
+        // Get the s0 and s1 coodinates for the t0 and t1 points.
+
+    }
+
+    // No intersection :(
+    return false;
+}
+
 inline bool isLinearIndependent( const rw::V3d& one, const rw::V3d& two )
 {
     rw::Matrix3 testMat;
@@ -96,7 +510,7 @@ inline bool setupQuaderMatrices( const Quader& in, rw::Matrix& inv_bottomMat, rw
     topMat.pos = in.tfr;
     topMat.posw = 1;
 
-    // I wonder where aap took that matrix invert code from.
+    // We are using a really shit math library for the moment.
     // Looks like copy paste to me.
     // REMEMBER: out is first argument, in is second.
     {
@@ -195,8 +609,6 @@ bool Quader::intersectWith( const Quader& right ) const
 {
     // A Quader is a 3 dimensional space that can be mapped between 8 points.
     // It looks like a deformed cube.
-
-    // aap´s math library is really shit, and he knows it.
     {
         rw::Matrix inv_bottomMat, inv_topMat;
 
@@ -204,7 +616,7 @@ bool Quader::intersectWith( const Quader& right ) const
 
         if ( !couldSetup )
             return false;
-
+        
         // Check points of the right quader in the local system of this quader.
         if ( isQuaderConfigurationIntersectingLocalSpace( inv_bottomMat, inv_topMat, right, false ) )
         {
@@ -544,6 +956,24 @@ inline bool Sphere::intersectLine( const rw::V3d& pos, const rw::V3d& dir, doubl
 // A cool testing thing, meow.
 void Tests( void )
 {
+    // Test plane equations.
+    {
+        Plane slipperyPlane_frontSunRight;
+        slipperyPlane_frontSunRight.pos = rw::V3d( -1, -1, -1 );
+        slipperyPlane_frontSunRight.a = rw::V3d( 2, 0, 2 );
+        slipperyPlane_frontSunRight.b = rw::V3d( 0, 2, 2 );
+
+        Plane slipperyPlane_invFrontSunRight;
+        slipperyPlane_invFrontSunRight.pos = rw::V3d( -1, -1, 1 );
+        slipperyPlane_invFrontSunRight.a = rw::V3d( 2, 0, -2 );
+        slipperyPlane_invFrontSunRight.b = rw::V3d( 0, 2, -2 );
+
+#if 0
+        assert( slipperyPlane_frontSunRight.intersectWith( slipperyPlane_invFrontSunRight ) == true );
+        assert( slipperyPlane_invFrontSunRight.intersectWith( slipperyPlane_frontSunRight ) == true );
+#endif
+    }
+
     // Build some quader and see logically if things make sense.
     Quader theQuaderOfTruth(
         // *bottom

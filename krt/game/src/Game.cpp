@@ -17,6 +17,8 @@
 
 #include <src/rwgta.h>
 
+#include <Windows.h>
+
 #pragma warning(disable : 4996)
 
 namespace krt
@@ -101,7 +103,7 @@ void Game::Run()
 	{
 		// limit frame rate and handle events
 		// TODO: non-busy wait?
-		int minMillis   = (this->maxFPS > 0) ? (1000 / this->maxFPS) : 1;
+		uint32_t minMillis   = (this->maxFPS > 0) ? (1000u / (uint32_t)this->maxFPS) : 1u;  // we can cast to unsigned because its bigger than zero.
 		uint32_t millis = 0;
 
 		uint64_t thisTime = 0;
@@ -110,12 +112,14 @@ void Game::Run()
 		{
 			thisTime = eventSystem.HandleEvents();
 
-			millis = thisTime - lastTime;
+			millis = (uint32_t)( thisTime - lastTime );
+
+            YieldThreadForShortTime();
 		} while (millis < minMillis);
 
 		// handle time scaling
 		float scale = this->timescale; // to be replaced by a console value, again
-		millis *= scale;
+		millis = (uint32_t)( (float)millis * scale );
 
 		if (millis < 1)
 		{

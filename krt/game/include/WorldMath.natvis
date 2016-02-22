@@ -1,0 +1,32 @@
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="krt::QuadTree &lt;*,*,*&gt;" >
+    <DisplayString>QuadTree ({$T2} x {$T2}, type: {"$T3"})</DisplayString>
+    <Expand HideRawView="true">
+      <Item Name="Depth">$T1</Item>
+      <ExpandedItem>this->root</ExpandedItem>
+    </Expand>
+  </Type>
+  <Type Name="krt::QuadTree &lt;*,*,*&gt;::Node &lt;*,*,*,*,*&gt;">
+    <DisplayString>Node</DisplayString>
+    <Expand HideRawView="true">
+      <Item Name="Dimm">$T5</Item>
+      <Synthetic Name="Pos">
+        <DisplayString>({$T7},{$T8})</DisplayString>
+      </Synthetic>
+      <Item Name="[TL]">this->topLeft</Item>
+      <Item Name="[TR]">this->topRight</Item>
+      <Item Name="[BL]">this->bottomLeft</Item>
+      <Item Name="[BR]">this->bottomRight</Item>
+    </Expand>
+  </Type>
+  <Type Name="krt::QuadTree &lt;*,*,*&gt;::Node &lt;*,*,*,*,*&gt;">
+    <DisplayString>Data</DisplayString>
+    <Expand HideRawView="true">
+      <Item Name="Dimm">$T5</Item>
+      <Synthetic Name="Pos">
+        <DisplayString>({$T7},{$T8})</DisplayString>
+      </Synthetic>
+      <Item Name="Data">this->data</Item>
+    </Expand>
+  </Type>
+</AutoVisualizer>

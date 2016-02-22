@@ -14,7 +14,14 @@
 namespace krt
 {
 GameUniverse::GameUniverse(const GameConfiguration& configuration)
-    : m_configuration(configuration), m_game(theGame)
+    : m_configuration(configuration), m_game(theGame),
+
+    // Initialize all game universe commands.
+    cmdAddImage("add_cdimage",
+        [](const GameUniversePtr& universe, const std::string& path)
+    {
+        universe->AddImage( path );
+    })
 {
 }
 

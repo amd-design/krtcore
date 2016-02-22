@@ -2,10 +2,21 @@
 
 // Important math about camera frustum and world sectoring.
 
+#define MATH_INLINE __forceinline
+
 namespace krt
 {
 namespace math
 {
+
+struct Plane
+{
+    rw::V3d pos;
+    rw::V3d a;
+    rw::V3d b;
+
+    inline bool intersectWith( const Plane& right ) const;
+};
 
 struct Sphere
 {

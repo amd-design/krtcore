@@ -34,6 +34,13 @@ public:
 		return Get(i);
 	}
 
+    inline const std::string& operator[](size_t i) const
+    {
+        assert(i < m_arguments.size());
+
+        return m_arguments[i];
+    }
+
 	inline size_t Count() const
 	{
 		return m_arguments.size();

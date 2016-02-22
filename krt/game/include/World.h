@@ -13,6 +13,8 @@ struct World
     World( void );
     ~World( void );
 
+    void PutEntitiesOnGrid( void );
+
 private:
     NestedList <Entity> entityList;
 };

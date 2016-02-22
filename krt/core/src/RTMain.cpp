@@ -4,10 +4,16 @@
 
 #include "Game.h"
 
+#include "WorldMath.h"
+
 namespace krt
 {
 int Main::Run(const ProgramArguments& arguments)
 {
+    // Run test code, meow.
+    // We should do that to self assert our correctness!
+    krt::math::Tests();
+
 	// parse argument list and handle console commands
 	sys::InitializeConsole();
 
@@ -16,7 +22,7 @@ int Main::Run(const ProgramArguments& arguments)
 	std::vector<std::pair<std::string, std::string>> setList;
 
 	{
-		for (int i : irange(arguments.Count()))
+		for (size_t i : irange(arguments.Count()))
 		{
 			const std::string& argument = arguments[i];
 

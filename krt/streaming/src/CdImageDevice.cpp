@@ -90,7 +90,8 @@ bool CdImageDevice::OpenImage(const std::string& imagePath)
 		}
 
 		// use the directory path in case bulk handles are equivalent to the parent handle
-		numEntries = parentDevice->GetLength(directoryPath) / sizeof(Entry);
+        // We assume that you dont actually be that crazy and make such tiny entires in the CdImage that you have more than 2^32 - 1.
+		numEntries = (uint32_t)( parentDevice->GetLength(directoryPath) / sizeof(Entry) );
 	}
 
 	// read the directory entry list

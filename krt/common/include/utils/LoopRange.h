@@ -28,7 +28,7 @@ public:
 			return (m_value != right.m_value);
 		}
 
-		const int& operator*() const
+		const T& operator*() const
 		{
 			return m_value;
 		}

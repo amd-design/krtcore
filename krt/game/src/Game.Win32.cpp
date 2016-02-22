@@ -47,4 +47,11 @@ void Game::MountUserDirectory()
 		vfs::Mount(device, "user:/");
 	}
 }
+
+void Game::YieldThreadForShortTime()
+{
+    // I do not want this thing to max out my CPU :/
+    // And we are not doing realistic simulations yet.
+    Sleep( 1 );
+}
 }

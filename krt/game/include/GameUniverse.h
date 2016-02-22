@@ -4,6 +4,8 @@
 
 #include <vfs/Device.h>
 
+#include <Console.CommandHelpers.h>
+
 namespace krt
 {
 struct GameConfiguration
@@ -56,13 +58,20 @@ class GameUniverse
 	{
 		auto it = m_modelIndexMapping.find(localId);
 
+        // We kind of do not want this to happen in our testing.
+        // But if it does, then handle it appropriately.
 		assert(it != m_modelIndexMapping.end());
+
+        if ( it == m_modelIndexMapping.end() )
+            return -1;
 
 		return it->second;
 	}
 
   private:
 	void AddImage(const std::string& relativePath);
+
+    ConsoleCommand cmdAddImage;
 
 	void LoadConfiguration(const std::string& relativePath);
 

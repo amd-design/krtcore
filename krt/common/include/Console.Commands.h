@@ -135,7 +135,55 @@ struct ConsoleArgumentName<std::string>
 };
 
 template <typename TArgument>
-struct ConsoleArgumentType<TArgument, std::enable_if_t<std::is_integral<TArgument>::value>>
+struct ConsoleArgumentType <TArgument, typename std::enable_if <std::is_same <TArgument, bool>::value>::type>
+{
+    static std::string Unparse( const TArgument& input )
+    {
+        if ( input == true )
+        {
+            return "true";
+        }
+        else
+        {
+            return "false";
+        }
+    }
+
+    static bool Parse( const std::string& input, TArgument *out )
+    {
+        const char *inputPtr = input.c_str();
+
+        bool retBool = false;
+
+        if ( _stricmp( inputPtr, "TRUE" ) == 0 )
+        {
+            retBool = true;
+        }
+        else if ( _stricmp( inputPtr, "FALSE" ) == 0 )
+        {
+            retBool = false;
+        }
+        else
+        {
+            // If the boolean declaration is not a recognized string, then just check whether its integral.
+            try
+            {
+                retBool = ( std::stoull( input ) != 0 );
+            }
+            catch( ... )
+            {
+                // Just do nothing.
+                // Assume that the best default is already written to retBool.
+            }
+        }
+
+        *out = retBool;
+        return true;
+    }
+};
+
+template <typename TArgument>
+struct ConsoleArgumentType<TArgument, std::enable_if_t<std::is_integral<TArgument>::value && !std::is_same<TArgument,bool>::value>>
 {
 	static std::string Unparse(const TArgument& input)
 	{
@@ -146,7 +194,7 @@ struct ConsoleArgumentType<TArgument, std::enable_if_t<std::is_integral<TArgumen
 	{
 		try
 		{
-			*out = std::stoull(input);
+			*out = (TArgument)std::stoull(input);
 
 			// no way to know if an integer is valid this lazy way, sadly :(
 			return true;
@@ -170,7 +218,7 @@ struct ConsoleArgumentType<TArgument, std::enable_if_t<std::is_floating_point<TA
 	{
 		try
 		{
-			*out = std::stod(input);
+			*out = (TArgument)std::stod(input);
 
 			return true;
 		}

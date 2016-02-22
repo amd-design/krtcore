@@ -65,7 +65,8 @@ workspace 'krt'
             'streaming/**.h',
             'streaming/**.cpp',
             'game/**.h',
-            'game/**.cpp'
+            'game/**.cpp',
+            '**.natvis'
         }
 
         links

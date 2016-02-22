@@ -50,6 +50,8 @@ class Game
   private:
 	void MountUserDirectory();
 
+    void YieldThreadForShortTime();
+
 	void LoadUniverseIfAvailable();
 
   private:
