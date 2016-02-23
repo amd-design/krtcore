@@ -164,7 +164,10 @@ void Game::Run()
 		LoadUniverseIfAvailable();
 
 		// rendering test
-		RenderingTest(gfxContext);
+		if (this->universes.size() > 0)
+		{
+			RenderingTest(gfxContext);
+		}
 
 		// whatever else might come to mind
 	}
