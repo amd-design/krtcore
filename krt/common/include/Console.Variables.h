@@ -246,11 +246,11 @@ static std::shared_ptr<internal::ConsoleVariableEntry<TValue>> CreateVariableEnt
 	if (oldEntry)
 	{
 		// if this is already an entry of the right type, return said entry
-		auto oldType = dynamic_cast<internal::ConsoleVariableEntry<TValue>*>(oldEntry.get());
+		auto oldType = std::dynamic_pointer_cast<internal::ConsoleVariableEntry<TValue>>(oldEntry);
 
-		if (oldType != nullptr)
+		if (oldType)
 		{
-			return std::shared_ptr<internal::ConsoleVariableEntry<TValue>>(oldType);
+			return oldType;
 		}
 
 		// not the same type, create a new entry we'll hopefully treat better
