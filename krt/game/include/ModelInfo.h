@@ -78,6 +78,8 @@ struct ModelManager : public streaming::StreamingTypeInterface
 
     ModelResource* GetModelByID( streaming::ident_t id );
 
+	ModelResource* GetModelByName( const std::string& name );
+
     void LoadAllModels( void );
 
     void LoadResource( streaming::ident_t localID, const void *dataBuf, size_t memSize ) override;

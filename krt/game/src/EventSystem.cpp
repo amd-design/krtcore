@@ -34,6 +34,16 @@ public:
 	}
 };
 
+void KeyEvent::Handle()
+{
+
+}
+
+void CharEvent::Handle()
+{
+
+}
+
 static void ProcessConsoleInput(EventSystem* eventSystem)
 {
 	const char* consoleBuffer = sys::GetConsoleInput();
@@ -48,8 +58,15 @@ uint64_t EventSystem::HandleEvents()
 {
 	while (true)
 	{
+		// try to get events from the event sources
 		ProcessConsoleInput(this);
 
+		for (const auto& eventSource : m_eventSources)
+		{
+			eventSource();
+		}
+
+		// loop through the event queue
 		std::unique_ptr<Event> event = GetEvent();
 
 		if (dynamic_cast<NullEvent*>(event.get()) != nullptr)
@@ -80,6 +97,11 @@ std::unique_ptr<Event> EventSystem::GetEvent()
 
 		return std::move(event);
 	}
+}
+
+void EventSystem::RegisterEventSourceFunction(const std::function<void()>& function)
+{
+	m_eventSources.push_back(function);
 }
 
 void EventSystem::QueueEvent(std::unique_ptr<Event>&& ev)

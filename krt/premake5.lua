@@ -32,6 +32,7 @@ workspace 'krt'
 
     filter 'system:windows'
         includedirs { 'dependencies/include/wtl/' }
+        defines { 'RW_D3D9' }
 
     filter 'configurations:Debug'
         defines { '_DEBUG', 'KRT_DEBUG' }

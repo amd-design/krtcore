@@ -205,6 +205,18 @@ ModelManager::ModelResource* ModelManager::GetModelByID( streaming::ident_t id )
     return this->models[ id ];
 }
 
+ModelManager::ModelResource* ModelManager::GetModelByName( const std::string& name )
+{
+	auto findIter = this->modelByName.find(name);
+
+	if (findIter != this->modelByName.end())
+	{
+		return findIter->second;
+	}
+
+	return NULL;
+}
+
 void ModelManager::LoadAllModels( void )
 {
     // Request all models and wait for them to load.

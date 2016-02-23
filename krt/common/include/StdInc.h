@@ -31,7 +31,19 @@
 #include <utils/StringConvert.h>
 #include <utils/LockUtil.h>
 
-#include <rw.h>
+// manually include RW stuff as we don't want D3D lingering in our global namespace
+//#include <rw.h>
+#include "src/rwbase.h"
+#include "src/rwplugin.h"
+#include "src/rwpipeline.h"
+#include "src/rwobjects.h"
+#include "src/rwps2.h"
+//#include "src/rwxbox.h"
+//#include "src/rwd3d.h"
+//#include "src/rwd3d8.h"
+//#include "src/rwd3d9.h"
+//#include "src/rwogl.h"
+
 #include <RwHelpers.h>
 
 #include <Console.Base.h>

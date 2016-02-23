@@ -5,6 +5,8 @@
 #include <fstream>
 #include <iostream>
 
+#include "GameWindow.h"
+
 #include "Console.CommandHelpers.h"
 #include "Console.h"
 
@@ -43,7 +45,7 @@ Game::Game(const std::vector<std::pair<std::string, std::string>>& setList) : st
 
 	// Initialize RW.
 	rw::platform     = rw::PLATFORM_D3D9;
-	rw::loadTextures = false;
+	rw::loadTextures = true;
 
 	gta::attachPlugins();
 
@@ -83,11 +85,21 @@ Game::~Game(void)
 	theGame = NULL;
 }
 
+void RenderingTest(void* gfxDevice);
+
 void Game::Run()
 {
 	sys::TimerContext timerContext;
 
 	EventSystem eventSystem;
+
+	std::unique_ptr<GameWindow> gameWindow = GameWindow::Create("ATG: TheGame", 1280, 720, &eventSystem);
+	void* gfxContext = gameWindow->CreateGraphicsContext();
+
+	eventSystem.RegisterEventSourceFunction([&] ()
+	{
+		gameWindow->ProcessEvents();
+	});
 
 	// run the main game loop
 	bool wantsToExit  = false;
@@ -151,6 +163,9 @@ void Game::Run()
 		// load the game universe if variables are valid
 		LoadUniverseIfAvailable();
 
+		// rendering test
+		RenderingTest(gfxContext);
+
 		// whatever else might come to mind
 	}
 }
@@ -207,6 +222,7 @@ void Game::LoadUniverseIfAvailable()
 	configuration.gameName = gameName;
 	configuration.rootPath = gameDir;
 
+	configuration.imageFiles.push_back("models/txd.img");
 	configuration.imageFiles.push_back("models/gta3.img");
 	configuration.imageFiles.push_back("models/gta_int.img");
 
