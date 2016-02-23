@@ -5,12 +5,16 @@
 #include <windows.h>
 #include <d3d9.h>
 
+#include <Console.Variables.h>
+
 namespace krt
 {
 void RenderingTest(void* gfxDevice)
 {
+	static std::unique_ptr<ConVar<std::string>> defaultRenderModel = std::make_unique<ConVar<std::string>>("default_render_model", ConVar_Archive, "ind_maindrag2");
+
 	static bool modelChanged = false;
-	static std::string modelName = "ind_maindrag2";
+	static std::string modelName = defaultRenderModel->GetValue();
 
 	static ConsoleCommand renderModel("render_model", [] (const std::string& newModelName)
 	{
