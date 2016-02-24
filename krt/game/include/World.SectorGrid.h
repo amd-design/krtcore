@@ -18,7 +18,9 @@ template <typename SectorDataType, size_t sectorBound, size_t sectorQuadTreeDept
 struct SectorGrid
 {
     // Remember that we want to put the center of sector as point (0, 0, 0).
-    static constexpr size_t _put_offset = ( sectorBound / 2 );
+	// d-do we? this breaks anything at the edge of the frustum
+    //static constexpr size_t _put_offset = ( sectorBound / 2 );
+	static constexpr size_t _put_offset = 0;
 
     inline SectorGrid( void )
     {
