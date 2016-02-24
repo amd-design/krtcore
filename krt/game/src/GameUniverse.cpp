@@ -39,6 +39,12 @@ void GameUniverse::Load()
 	vfs::DevicePtr device = std::make_shared<vfs::RelativeDevice>(m_configuration.rootPath);
 	vfs::Mount(device, GetMountPoint());
 
+	// load generic.txd if the game has one
+	if (m_configuration.gameName == "gta3" || m_configuration.gameName == "gtavc")
+	{
+		m_game->GetTextureManager().RegisterResource("generic", device, GetMountPoint() + "models/generic.txd");
+	}
+
 	// enqueue pre-cached IMG files
 	for (const auto& imageFile : m_configuration.imageFiles)
 	{
