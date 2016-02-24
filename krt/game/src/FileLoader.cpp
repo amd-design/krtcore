@@ -534,7 +534,7 @@ struct inst_section_manager
 
 		Entity* resultEntity = new Entity(theGame);
 
-		resultEntity->SetModelIndex(modelID);
+		resultEntity->SetModelIndex(modelInfo->GetID());
 
 		// Assign the matrix.
 		{
