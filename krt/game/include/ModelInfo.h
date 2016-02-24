@@ -8,8 +8,8 @@
 
 #include <Console.CommandHelpers.h>
 
-#define MODEL_ID_BASE   0
-#define MAX_MODELS      20000
+#define MODEL_ID_BASE 0
+#define MAX_MODELS 20000
 
 namespace krt
 {
@@ -17,91 +17,89 @@ namespace krt
 // General model information management container.
 struct ModelManager : public streaming::StreamingTypeInterface
 {
-    enum class eModelType
-    {
-        ATOMIC,
-        VEHICLE,
-        PED
-    };
-    
-    struct ModelResource
-    {
-        inline streaming::ident_t GetID( void ) const           { return this->id; }
-        inline eModelType GetType( void ) const                 { return this->modelType; }
-        inline float GetLODDistance( void ) const               { return this->lodDistance; }
-		inline int GetFlags( void ) const						{ return this->flags; }
+	enum class eModelType
+	{
+		ATOMIC,
+		VEHICLE,
+		PED
+	};
 
-        inline ModelResource* GetLODModel( void )               { return this->lod_model; }
+	struct ModelResource
+	{
+		inline streaming::ident_t GetID(void) const { return this->id; }
+		inline eModelType GetType(void) const { return this->modelType; }
+		inline float GetLODDistance(void) const { return this->lodDistance; }
+		inline int GetFlags(void) const { return this->flags; }
 
-        rw::Object* CloneModel( void );
-        void ReleaseModel( rw::Object *rwobj );
+		inline ModelResource* GetLODModel(void) { return this->lod_model; }
 
-    private:
-        friend struct ModelManager;
+		rw::Object* CloneModel(void);
+		void ReleaseModel(rw::Object* rwobj);
 
-        static void NativeReleaseModel( rw::Object *rwobj );
+	  private:
+		friend struct ModelManager;
 
-        inline ModelResource( vfs::DevicePtr device, std::string pathToRes ) : vfsResLoc( device, std::move( pathToRes ) )
-        {
-            return;
-        }
+		static void NativeReleaseModel(rw::Object* rwobj);
 
-        inline ~ModelResource( void )
-        {
-            return;
-        }
+		inline ModelResource(vfs::DevicePtr device, std::string pathToRes) : vfsResLoc(device, std::move(pathToRes))
+		{
+			return;
+		}
 
-        ModelManager *manager;
+		inline ~ModelResource(void)
+		{
+			return;
+		}
 
-        streaming::ident_t id;
-        streaming::ident_t texDictID;
-        float lodDistance;
-        int flags;
+		ModelManager* manager;
 
-        ModelResource *lod_model;   // model of a lower quality model than this one.
+		streaming::ident_t id;
+		streaming::ident_t texDictID;
+		float lodDistance;
+		int flags;
 
-        eModelType modelType;
+		ModelResource* lod_model; // model of a lower quality model than this one.
 
-        DeviceResourceLocation vfsResLoc;
+		eModelType modelType;
 
-        rw::Object *modelPtr;
+		DeviceResourceLocation vfsResLoc;
 
-        SRWLOCK_VIRTUAL lockModelLoading;
-    };
+		rw::Object* modelPtr;
 
-    ModelManager( streaming::StreamMan& streaming, TextureManager& texManager );
-    ~ModelManager( void );
+		SRWLOCK_VIRTUAL lockModelLoading;
+	};
 
-    streaming::ident_t RegisterAtomicModel(
-        std::string name, std::string texDictName, float lodDistance, int flags,
-        std::string absFilePath
-    );
+	ModelManager(streaming::StreamMan& streaming, TextureManager& texManager);
+	~ModelManager(void);
 
-    ModelResource* GetModelByID( streaming::ident_t id );
+	streaming::ident_t RegisterAtomicModel(
+	    std::string name, std::string texDictName, float lodDistance, int flags,
+	    std::string absFilePath);
 
-	ModelResource* GetModelByName( const std::string& name );
+	ModelResource* GetModelByID(streaming::ident_t id);
 
-    void LoadAllModels( void );
+	ModelResource* GetModelByName(const std::string& name);
 
-    void LoadResource( streaming::ident_t localID, const void *dataBuf, size_t memSize ) override;
-    void UnloadResource( streaming::ident_t localID ) override;
+	void LoadAllModels(void);
 
-    size_t GetObjectMemorySize( streaming::ident_t localID ) const override;
+	void LoadResource(streaming::ident_t localID, const void* dataBuf, size_t memSize) override;
+	void UnloadResource(streaming::ident_t localID) override;
 
-private:
-    streaming::StreamMan& streaming;
-    TextureManager& texManager;
+	size_t GetObjectMemorySize(streaming::ident_t localID) const override;
 
-    std::vector <ModelResource*> models;
+  private:
+	streaming::StreamMan& streaming;
+	TextureManager& texManager;
 
-	std::atomic <streaming::ident_t> curModelId;
+	std::vector<ModelResource*> models;
 
-    std::map <std::string, ModelResource*> modelByName;
+	std::atomic<streaming::ident_t> curModelId;
 
-    std::map <std::string, ModelResource*> basifierLookup;
-    std::map <std::string, ModelResource*> lodifierLookup;
+	std::map<std::string, ModelResource*> modelByName;
+
+	std::map<std::string, ModelResource*> basifierLookup;
+	std::map<std::string, ModelResource*> lodifierLookup;
 
 	std::unique_ptr<ConsoleCommand> loadAllModelsCommand;
 };
-
 }
