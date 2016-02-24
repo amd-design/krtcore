@@ -29,6 +29,7 @@ struct ModelManager : public streaming::StreamingTypeInterface
         inline streaming::ident_t GetID( void ) const           { return this->id; }
         inline eModelType GetType( void ) const                 { return this->modelType; }
         inline float GetLODDistance( void ) const               { return this->lodDistance; }
+		inline int GetFlags( void ) const						{ return this->flags; }
 
         inline ModelResource* GetLODModel( void )               { return this->lod_model; }
 
