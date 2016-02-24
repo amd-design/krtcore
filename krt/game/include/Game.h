@@ -16,6 +16,8 @@
 
 #include "Console.VariableHelpers.h"
 
+#include "Camera.h"
+
 namespace krt
 {
 
@@ -47,10 +49,12 @@ class Game
 
 	GameUniversePtr GetUniverse(const std::string& name);
 
+	Camera& GetWorldCamera(void) { return this->worldCam; }
+
   private:
 	void MountUserDirectory();
 
-    void YieldThreadForShortTime();
+	void YieldThreadForShortTime();
 
 	void LoadUniverseIfAvailable();
 
@@ -74,6 +78,8 @@ class Game
 	int maxFPS;
 
 	float timescale;
+
+	Camera worldCam; // camera to render the main world in
 
   private:
 	std::unique_ptr<ConVar<int>> maxFPSVariable;

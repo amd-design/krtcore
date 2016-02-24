@@ -33,11 +33,11 @@ Game::Game(const std::vector<std::pair<std::string, std::string>>& setList) : st
 	assert(theGame == NULL);
 
 	// Initialize console variables.
-	maxFPSVariable = std::make_unique<ConVar<int>>("maxFPS", ConVar_Archive, 60, &maxFPS);
+	maxFPSVariable    = std::make_unique<ConVar<int>>("maxFPS", ConVar_Archive, 60, &maxFPS);
 	timescaleVariable = std::make_unique<ConVar<float>>("timescale", ConVar_None, 1.0f, &timescale);
 
 	// Console variables for loading the default game universe.
-	gameVariable = std::make_unique<ConVar<std::string>>("gameName", ConVar_Archive, "gta3");
+	gameVariable     = std::make_unique<ConVar<std::string>>("gameName", ConVar_Archive, "gta3");
 	gamePathVariable = std::make_unique<ConVar<std::string>>("gamePath", ConVar_Archive, "");
 
 	// We can only have one game :)
@@ -49,16 +49,23 @@ Game::Game(const std::vector<std::pair<std::string, std::string>>& setList) : st
 
 	gta::attachPlugins();
 
+	// Prepare main world camera. (NOT FINAL).
+	worldCam.Initialize();
+
+	worldCam.SetAspectRatio(16.0f / 9.0f);
+	worldCam.SetFOV(65.0f);
+	worldCam.SetFarClip(1500.0f);
+
 	// mount the user directory
 	MountUserDirectory();
 
 	// run config.cfg
-	console::ExecuteSingleCommand(ProgramArguments{ "exec", "user:/config.cfg" });
+	console::ExecuteSingleCommand(ProgramArguments{"exec", "user:/config.cfg"});
 
 	// override variables from console
 	for (auto& pair : setList)
 	{
-		console::ExecuteSingleCommand(ProgramArguments{ "set", pair.first, pair.second });
+		console::ExecuteSingleCommand(ProgramArguments{"set", pair.first, pair.second});
 	}
 
 	// Set up game related things.
@@ -70,6 +77,9 @@ Game::Game(const std::vector<std::pair<std::string, std::string>>& setList) : st
 
 Game::~Game(void)
 {
+	// Delete important RW resources owned by the game.
+	worldCam.Shutdown();
+
 	// Delete all our entities.
 	{
 		while (!LIST_EMPTY(this->activeEntities.root))
@@ -94,10 +104,9 @@ void Game::Run()
 	EventSystem eventSystem;
 
 	std::unique_ptr<GameWindow> gameWindow = GameWindow::Create("ATG: TheGame", 1280, 720, &eventSystem);
-	void* gfxContext = gameWindow->CreateGraphicsContext();
+	void* gfxContext                       = gameWindow->CreateGraphicsContext();
 
-	eventSystem.RegisterEventSourceFunction([&] ()
-	{
+	eventSystem.RegisterEventSourceFunction([&]() {
 		gameWindow->ProcessEvents();
 	});
 
@@ -106,8 +115,7 @@ void Game::Run()
 	uint64_t lastTime = 0;
 
 	// exit command
-	ConsoleCommand quitCommand("quit", [&] ()
-	{
+	ConsoleCommand quitCommand("quit", [&]() {
 		wantsToExit = true;
 	});
 
@@ -115,8 +123,8 @@ void Game::Run()
 	{
 		// limit frame rate and handle events
 		// TODO: non-busy wait?
-		uint32_t minMillis   = (this->maxFPS > 0) ? (1000u / (uint32_t)this->maxFPS) : 1u;  // we can cast to unsigned because its bigger than zero.
-		uint32_t millis = 0;
+		uint32_t minMillis = (this->maxFPS > 0) ? (1000u / (uint32_t) this->maxFPS) : 1u; // we can cast to unsigned because its bigger than zero.
+		uint32_t millis    = 0;
 
 		uint64_t thisTime = 0;
 
@@ -124,14 +132,14 @@ void Game::Run()
 		{
 			thisTime = eventSystem.HandleEvents();
 
-			millis = (uint32_t)( thisTime - lastTime );
+			millis = (uint32_t)(thisTime - lastTime);
 
-            YieldThreadForShortTime();
+			YieldThreadForShortTime();
 		} while (millis < minMillis);
 
 		// handle time scaling
 		float scale = this->timescale; // to be replaced by a console value, again
-		millis = (uint32_t)( (float)millis * scale );
+		millis      = (uint32_t)((float)millis * scale);
 
 		if (millis < 1)
 		{
@@ -167,7 +175,7 @@ void Game::Run()
 		if (this->universes.size() > 0)
 		{
 			//RenderingTest(gfxContext);
-            theGame->GetWorld()->RenderWorld( gfxContext );
+			theGame->GetWorld()->RenderWorld(gfxContext);
 		}
 
 		// whatever else might come to mind
@@ -183,8 +191,8 @@ void Game::LoadUniverseIfAvailable()
 	}
 
 	// store variables
-	std::string gameName = this->gameVariable->GetValue();
-	std::string gamePath = this->gamePathVariable->GetValue() + "/";
+	std::string gameName   = this->gameVariable->GetValue();
+	std::string gamePath   = this->gamePathVariable->GetValue() + "/";
 	std::string configFile = "data/gta.dat";
 
 	if (gameName == "gta3")

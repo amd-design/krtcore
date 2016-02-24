@@ -58,12 +58,14 @@ class GameUniverse
 	{
 		auto it = m_modelIndexMapping.find(localId);
 
-        // We kind of do not want this to happen in our testing.
-        // But if it does, then handle it appropriately.
+#if _DEBUG
+		// We kind of do not want this to happen in our testing.
+		// But if it does, then handle it appropriately.
 		assert(it != m_modelIndexMapping.end());
+#endif
 
-        if ( it == m_modelIndexMapping.end() )
-            return -1;
+		if (it == m_modelIndexMapping.end())
+			return -1;
 
 		return it->second;
 	}
@@ -71,7 +73,7 @@ class GameUniverse
   private:
 	void AddImage(const std::string& relativePath);
 
-    ConsoleCommand cmdAddImage;
+	ConsoleCommand cmdAddImage;
 
 	void LoadConfiguration(const std::string& relativePath);
 

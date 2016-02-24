@@ -57,8 +57,8 @@ struct SectorGrid
         LIST_FOREACH_END
     }
 
-    template <typename callbackType>
-    inline void VisitSectorsByFrustum( const math::Frustum& frustum, callbackType& cb ) const
+    template <typename callbackType, typename frustumType>
+    inline void VisitSectorsByFrustum( const frustumType& frustum, callbackType& cb ) const
     {
         // For each visible sector, actually call our callback.
         LIST_FOREACH_BEGIN( Sector, this->sectorList.root, node )
