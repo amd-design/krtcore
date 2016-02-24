@@ -1522,7 +1522,7 @@ inline bool calculatePlaneAdjacencyMatrices(
 
     // Calculate plane normal.
     // We should use the primary vectors to get a normal that points outside the Quader.
-    rw::V3d planeNormal = rw::normalize( rw::cross( prim_right, prim_top ) );
+    rw::V3d planeNormal = rw::normalize( rw::cross( rw::normalize( prim_right ), rw::normalize( prim_top ) ) );
 
     // Set up plane space matrices.
     rw::Matrix planeSpace_bottom;
@@ -1591,9 +1591,9 @@ inline Quader::Quader(
     bool calculateRearPlaneMatrices = calculatePlaneAdjacencyMatrices( brl, brr, trl, trr, this->rearPlane_inv_planeSpace_bottom, this->rearPlane_inv_planeSpace_top );
     bool calculateLeftPlaneMatrices = calculatePlaneAdjacencyMatrices( bfl, brl, tfl, trl, this->leftPlane_inv_planeSpace_bottom, this->leftPlane_inv_planeSpace_top );
     bool calculateFrontPlaneMatrices = calculatePlaneAdjacencyMatrices( bfr, bfl, tfr, tfl, this->frontPlane_inv_planeSpace_bottom, this->frontPlane_inv_planeSpace_top );
-    bool calculateRightPlaneMatrices = calculatePlaneAdjacencyMatrices( brr, bfr, trr, tfr, this->rightPlane_inv_planeSpace_bottom, this->rightPlane_inv_planeSpace_bottom );
-    bool calculateBottomPlaneMatrices = calculatePlaneAdjacencyMatrices( brr, brl, bfr, bfl, this->bottomPlane_inv_planeSpace_bottom, this->bottomPlane_inv_planeSpace_top );
-    bool calculateTopPlaneMatrices = calculatePlaneAdjacencyMatrices( trr, trl, tfr, tfl, this->topPlane_inv_planeSpace_bottom, this->topPlane_inv_planeSpace_top );
+    bool calculateRightPlaneMatrices = calculatePlaneAdjacencyMatrices( brr, bfr, trr, tfr, this->rightPlane_inv_planeSpace_bottom, this->rightPlane_inv_planeSpace_top );
+    bool calculateBottomPlaneMatrices = calculatePlaneAdjacencyMatrices( bfl, bfr, brl, brr, this->bottomPlane_inv_planeSpace_bottom, this->bottomPlane_inv_planeSpace_top );
+    bool calculateTopPlaneMatrices = calculatePlaneAdjacencyMatrices( trl, trr, tfl, tfr, this->topPlane_inv_planeSpace_bottom, this->topPlane_inv_planeSpace_top );
 
     // Should actually work if the planes actually are planes.
     assert( calculateRearPlaneMatrices == true );
@@ -1941,7 +1941,7 @@ bool Quader::intersectWith( const Sphere& right ) const
         }
 
         if ( cached_calculateSpherePlaneAdjacencyIntersect(    //right
-                 this->rightPlane_inv_planeSpace_bottom, this->rightPlane_inv_planeSpace_bottom,
+                 this->rightPlane_inv_planeSpace_bottom, this->rightPlane_inv_planeSpace_top,
                  spherePos, radius,
                  result
              ) )
@@ -1951,7 +1951,7 @@ bool Quader::intersectWith( const Sphere& right ) const
         }
              
         if ( cached_calculateSpherePlaneAdjacencyIntersect(    //top
-                 this->topPlane_inv_planeSpace_top, this->topPlane_inv_planeSpace_bottom,
+                 this->topPlane_inv_planeSpace_bottom, this->topPlane_inv_planeSpace_top,
                  spherePos, radius,
                  result
              ) )
@@ -1961,7 +1961,7 @@ bool Quader::intersectWith( const Sphere& right ) const
         }
              
         if ( cached_calculateSpherePlaneAdjacencyIntersect(    //bottom
-                 this->bottomPlane_inv_planeSpace_top, this->bottomPlane_inv_planeSpace_bottom,
+                 this->bottomPlane_inv_planeSpace_bottom, this->bottomPlane_inv_planeSpace_top,
                  spherePos, radius,
                  result
              ) )
