@@ -30,6 +30,10 @@ void RenderingTest(void* gfxDevice)
 
 	// handle original model data
 	auto model = theGame->GetModelManager().GetModelByName(modelName);
+
+    if ( !model )
+        return;
+
 	auto id = model->GetID();
 
 	static streaming::ident_t lastID;
