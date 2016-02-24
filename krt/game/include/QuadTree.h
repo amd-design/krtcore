@@ -13,16 +13,6 @@ namespace krt
 template <size_t depth, size_t boundDimm, typename DataType>
 struct QuadTree
 {
-    inline QuadTree( void )
-    {
-
-    }
-
-    inline ~QuadTree( void )
-    {
-
-    }
-
     template <typename numberType, size_t minX, size_t minY, size_t maxX, size_t maxY>
     MATH_INLINE static bool IsPointInBounds( numberType x, numberType y )
     {
@@ -32,22 +22,27 @@ struct QuadTree
     template <typename numberType, size_t minX, size_t minY, size_t maxX, size_t maxY>
     MATH_INLINE static bool IsBoundsInBounds( numberType box_minX, numberType box_minY, numberType box_maxX, numberType box_maxY )
     {
-        return ( false );   // TODO.
+        typedef sliceOfData <numberType> qt_slice_t;
+
+        const qt_slice_t width_slice_sector( minX, maxX - minX );
+        const qt_slice_t height_slice_sector( minY, maxY - minY );
+
+        const qt_slice_t width_slice_box( box_minX, box_maxX - box_minX );
+        const qt_slice_t height_slice_box( box_minY, box_maxY - box_minY );
+
+        qt_slice_t::eIntersectionResult width_intersect_result = width_slice_sector.intersectWith( width_slice_box );
+        qt_slice_t::eIntersectionResult height_intersect_result = height_slice_sector.intersectWith( height_slice_box );
+
+        bool isIntersecting =
+            qt_slice_t::isFloatingIntersect( width_intersect_result ) == false &&
+            qt_slice_t::isFloatingIntersect( height_intersect_result ) == false;
+
+        return isIntersecting;
     }
 
     template <size_t depth, size_t boundDimm, typename DataType, size_t xOff, size_t yOff>
     struct Node
     {
-        inline Node( void )
-        {
-
-        }
-
-        inline ~Node( void )
-        {
-
-        }
-
         static size_t constexpr boundDimm = boundDimm;
 
     private:
@@ -71,22 +66,40 @@ struct QuadTree
                 bottomRight.VisitByPoint( x, y, cb );
             }
         }
+
+        template <typename numberType, typename callbackType>
+        MATH_INLINE void VisitByBounds( numberType minX, numberType minY, numberType maxX, numberType maxY, callbackType& cb )
+        {
+            // Taking care of our bounds ourselves.
+            if ( IsBoundsInBounds <numberType, xOff, yOff, xOff + boundDimm, yOff + boundDimm> ( minX, minY, maxX, maxY ) )
+            {
+                topLeft.VisitByBounds( minX, minY, maxX, maxY, cb );
+                topRight.VisitByBounds( minX, minY, maxX, maxY, cb );
+                bottomLeft.VisitByBounds( minX, minY, maxX, maxY, cb );
+                bottomRight.VisitByBounds( minX, minY, maxX, maxY, cb );
+            }
+        }
+
+        template <typename callbackType>
+        MATH_INLINE void ForAllEntries( callbackType& cb )
+        {
+            topLeft.ForAllEntries( cb );
+            topRight.ForAllEntries( cb );
+            bottomLeft.ForAllEntries( cb );
+            bottomRight.ForAllEntries( cb );
+        }
     };
 
     template <size_t boundDimm, typename DataType, size_t xOff, size_t yOff>
     struct Node <0, boundDimm, DataType, xOff, yOff>
     {
-        inline Node( void )
-        {
-
-        }
-
-        inline ~Node( void )
-        {
-            
-        }
-
         static size_t constexpr boundDimm = boundDimm;
+
+        inline Node( void ) : data( xOff, yOff, xOff + boundDimm, yOff + boundDimm )
+        {
+            // We want each data to know about its bounds.
+            return;
+        }
 
     private:
         DataType data;
@@ -101,6 +114,21 @@ struct QuadTree
                 // Call the thing.
                 cb( this->data );
             }
+        }
+
+        template <typename numberType, typename callbackType>
+        MATH_INLINE void VisitByBounds( numberType minX, numberType minY, numberType maxX, numberType maxY, callbackType& cb )
+        {
+            if ( IsBoundsInBounds <numberType, xOff, yOff, xOff + boundDimm, yOff + boundDimm> ( minX, minY, maxX, maxY ) )
+            {
+                cb( this->data );
+            }
+        }
+
+        template <typename callbackType>
+        MATH_INLINE void ForAllEntries( callbackType& cb )
+        {
+            cb( this->data );
         }
     };
 

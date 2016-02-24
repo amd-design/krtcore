@@ -32,12 +32,19 @@ Entity::Entity( Game *ourGame )
     this->rwObject = NULL;
 
     this->onWorld = NULL;   // we are not part of a world.
+
+    this->cachedBoundSphereRadius = 300.0f; // TODO: cache the real bounding sphere radius in some file so we dont need the model
 }
 
 Entity::~Entity( void )
 {
     // Make sure we released our RW object.
     this->DeleteRWObject();
+
+    // Make sure we are not references anywhere anymore.
+    {
+        this->RemoveEntityFromWorldSectors();
+    }
 
     // Remove us from any world.
     this->LinkToWorld( NULL );
@@ -206,7 +213,7 @@ void Entity::SetModelling( const rw::Matrix& mat )
     {
         this->matrix = mat;
 
-        this->hasLocalMatrix = false;
+        this->hasLocalMatrix = true;
     }
     else
     {
@@ -299,8 +306,18 @@ bool Entity::GetWorldBoundingSphere( rw::Sphere& sphereOut ) const
 {
     rw::Object *rwObj = this->rwObject;
 
-    if ( !rwObj == NULL )
-        return false;
+    if ( rwObj == NULL )
+    {
+        // Even if we have no model we need a bounding sphere.
+        const rw::Matrix& curMatrix = this->GetMatrix();
+
+        sphereOut.center = curMatrix.pos;
+        sphereOut.radius = this->cachedBoundSphereRadius;
+
+        return true;
+    }
+
+    bool hasSphere = false;
 
     if ( rwObj->type == rw::Atomic::ID )
     {
@@ -311,17 +328,24 @@ bool Entity::GetWorldBoundingSphere( rw::Sphere& sphereOut ) const
         if ( atomicSphere )
         {
             sphereOut = *atomicSphere;
-            return true;
+           
+            hasSphere = true;
         }
     }
     else if ( rwObj->type == rw::Clump::ID )
     {
         rw::Clump *clump = (rw::Clump*)rwObj;
 
-        return RpClumpCalculateBoundingSphere( clump, sphereOut );
+        hasSphere = RpClumpCalculateBoundingSphere( clump, sphereOut );
     }
 
-    return false;
+    if ( hasSphere )
+    {
+        // Store the last calculated bounding sphere radius for later.
+        this->cachedBoundSphereRadius = sphereOut.radius;
+    }
+
+    return hasSphere;
 }
 
 void Entity::LinkToWorld( World *theWorld )
@@ -406,6 +430,31 @@ bool Entity::IsHigherLODOf( Entity *inst ) const
 ModelManager::ModelResource* Entity::GetModelInfo( void ) const
 {
     return theGame->GetModelManager().GetModelByID( this->modelID );
+}
+
+void Entity::AddEntityWorldSectorReference( EntityReference *refPtr )
+{
+    this->worldSectorReferences.push_back( refPtr );
+}
+
+void Entity::RemoveEntityFromWorldSectors( void )
+{
+    while ( this->worldSectorReferences.empty() == false )
+    {
+        EntityReference *refPtr = this->worldSectorReferences.front();
+
+        refPtr->Unlink();
+    }
+}
+
+void Entity::RemoveEntityWorldReference( EntityReference *refPtr )
+{
+    auto find_iter = std::find( this->worldSectorReferences.begin(), this->worldSectorReferences.end(), refPtr );
+
+    if ( find_iter == this->worldSectorReferences.end() )
+        return;
+
+    this->worldSectorReferences.erase( find_iter );
 }
 
 }

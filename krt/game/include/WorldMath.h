@@ -4,6 +4,8 @@
 
 #define MATH_INLINE __forceinline
 
+//#define USE_MATH_VERIFICATION
+
 namespace krt
 {
 namespace math
@@ -15,7 +17,16 @@ struct Plane
     rw::V3d a;
     rw::V3d b;
 
-    inline bool intersectWith( const Plane& right ) const;
+    bool intersectWith( const Plane& right ) const;
+};
+
+struct TrianglePlane
+{
+    rw::V3d pos;
+    rw::V3d a;
+    rw::V3d b;
+
+    bool intersectWith( const TrianglePlane& right ) const;
 };
 
 struct Sphere
@@ -23,7 +34,7 @@ struct Sphere
     rw::V3d point;
     float radius;
 
-    inline bool intersectLine( const rw::V3d& pos, const rw::V3d& dir, double& first, double& second ) const;
+    bool intersectLine( const rw::V3d& pos, const rw::V3d& dir, double& first, double& second ) const;
 };
 
 // Don't mind the German names. :)
@@ -34,13 +45,23 @@ struct Quader
         rw::V3d trl, rw::V3d trr, rw::V3d tfl, rw::V3d tfr
     );
 
-    inline bool isPointInside( const rw::V3d& point ) const;
-    inline bool intersectWith( const Quader& right ) const;
-    inline bool intersectWith( const Sphere& right ) const;
+    bool isPointInside( const rw::V3d& point ) const;
+    bool intersectWith( const Quader& right ) const;
+    bool intersectWith( const Sphere& right ) const;
 
     // Please do not write into those fields directly!
-    const rw::V3d brl, brr, bfl, bfr; // bottom plane.
-    const rw::V3d trl, trr, tfl, tfr; // top plane.
+    rw::V3d brl, brr, bfl, bfr; // bottom plane.
+    rw::V3d trl, trr, tfl, tfr; // top plane.
+
+private:
+    rw::Matrix inv_localSpace_bottom, inv_localSpace_top;
+
+    rw::Matrix leftPlane_inv_planeSpace_bottom, leftPlane_inv_planeSpace_top;
+    rw::Matrix rightPlane_inv_planeSpace_bottom, rightPlane_inv_planeSpace_top;
+    rw::Matrix topPlane_inv_planeSpace_bottom, topPlane_inv_planeSpace_top;
+    rw::Matrix bottomPlane_inv_planeSpace_bottom, bottomPlane_inv_planeSpace_top;
+    rw::Matrix frontPlane_inv_planeSpace_bottom, frontPlane_inv_planeSpace_top;
+    rw::Matrix rearPlane_inv_planeSpace_bottom, rearPlane_inv_planeSpace_top;
 };
 
 // A function to test our math.

@@ -9,6 +9,12 @@ namespace krt
 {
 class Game;
 
+class EntityReference abstract
+{
+public:
+    virtual void Unlink( void ) = 0;
+};
+
 struct Entity
 {
 	friend class Game;
@@ -23,6 +29,8 @@ struct Entity
 
     bool CreateRWObject( void );
     void DeleteRWObject( void );
+
+    rw::Object* GetRWObject( void )     { return this->rwObject; }
 
     void SetModelling( const rw::Matrix& mat );
     const rw::Matrix& GetModelling( void ) const;
@@ -43,6 +51,11 @@ struct Entity
 
     inline Game* GetGame( void ) const          { return this->ourGame; }
 
+    void AddEntityWorldSectorReference( EntityReference *refPtr );
+    void RemoveEntityFromWorldSectors( void );
+
+    void RemoveEntityWorldReference( EntityReference *refPtr );
+
 private:
     Game *ourGame;
 
@@ -58,6 +71,8 @@ private:
     bool isTunnelTransition;
     bool isUnimportantToStreamer;
 
+    bool isStaticWorldEntity;
+
     rw::Matrix matrix;
     bool hasLocalMatrix;
 
@@ -70,6 +85,10 @@ private:
     NestedListEntry <Entity> worldNode;
 
     World *onWorld;
+
+    mutable float cachedBoundSphereRadius;  // if we have no model we need to have a way to detect visibility
+
+    std::list <EntityReference*> worldSectorReferences;
 };
 
 }

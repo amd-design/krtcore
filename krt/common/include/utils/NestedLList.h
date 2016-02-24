@@ -46,12 +46,12 @@ template <typename listType>    inline bool LIST_EMPTY( listType& link )        
 #define LIST_FOREACH_BEGIN(type, root, node) for ( NestedListEntry <type> *iter = (root).next, *niter; iter != &(root); iter = niter ) { type *item = LIST_GETITEM(type, iter, node); niter = iter->next;
 #define LIST_FOREACH_END }
 
-template < class type >
+template < class type, int _node_offset = -1 >
 struct NestedListEntry
 {
     NestedListEntry <type> *next, *prev;
 };
-template < class type >
+template < class type, int _node_offset = -1 >
 struct NestedList
 {
     NestedListEntry <type> root;
