@@ -58,12 +58,12 @@ struct SectorGrid
     }
 
     template <typename callbackType>
-    inline void VisitSectorsByFrustum( const math::Quader& frustum, callbackType& cb ) const
+    inline void VisitSectorsByFrustum( const math::Frustum& frustum, callbackType& cb ) const
     {
         // For each visible sector, actually call our callback.
         LIST_FOREACH_BEGIN( Sector, this->sectorList.root, node )
             
-            if ( item->sectorQuader.intersectWith( frustum ) )
+            if ( frustum.intersectWith(item->sectorQuader) )
             {
                 // This sector is visible, that means we have to check for visible sub data entries.
                 item->content.root.ForAllEntries(
@@ -71,7 +71,7 @@ struct SectorGrid
                 {
                     if ( sectorData.IsValid() )
                     {
-                        if ( sectorData.entryQuader.intersectWith( frustum ) )
+                        if ( frustum.intersectWith(sectorData.entryQuader) )
                         {
                             // This area on the map is visible, so lets give it to the callback.
                             cb( sectorData.data );

@@ -49,40 +49,20 @@ inline rw::V3d corvec( rw::V3d rwvec )
     return rw::V3d( rwvec.x, rwvec.z, rwvec.y );
 }
 
-inline math::Quader getCameraFrustum( rw::Camera *camera, float fov_angle )
+inline math::Frustum getCameraFrustum( rw::Camera *camera, float fov_angle )
 {
-    // Calculate it ourselves.
-    float farPlaneDist = camera->farPlane;
-    float nearPlaneDist = camera->nearPlane;
+	rw::Matrix viewMat;
+	rw::Matrix cameraWorldMat = *camera->getFrame()->getLTM();
+	rw::Matrix::invert(&viewMat, &cameraWorldMat);
 
-    double fov = DEG2RAD(fov_angle);
-    double ar = 16.0f / 9.0f;
+	// why???
+	rw::Matrix cameraProjMat;
+	memcpy(&cameraProjMat, camera->projMat, sizeof(rw::Matrix));
 
-    double Hnear = 2 * tan( fov / 2 ) * nearPlaneDist;
-    double Wnear = Hnear * ar;
+	rw::Matrix viewProj;
+	rw::Matrix::mult(&viewProj, &cameraProjMat, &viewMat);
 
-    double Hfar = 2 * tan( fov / 2 ) * farPlaneDist;
-    double Wfar = Hfar * ar;
-
-    rw::Matrix cameraWorldMat = *camera->getFrame()->getLTM();
-
-    float half_Wnear = (float)( Wnear / 2 );
-    float half_Hnear = (float)( Hnear / 2 );
-    
-    float half_Wfar = (float)( Wfar / 2 );
-    float half_Hfar = (float)( Hfar / 2 );
-
-    rw::V3d brl = cameraWorldMat.transPoint( rw::V3d( -half_Wnear, -half_Hnear, nearPlaneDist ) );
-    rw::V3d brr = cameraWorldMat.transPoint( rw::V3d(  half_Wnear, -half_Hnear, nearPlaneDist ) );
-    rw::V3d trl = cameraWorldMat.transPoint( rw::V3d( -half_Wnear,  half_Hnear, nearPlaneDist ) );
-    rw::V3d trr = cameraWorldMat.transPoint( rw::V3d(  half_Wnear,  half_Hnear, nearPlaneDist ) );
-    rw::V3d bfl = cameraWorldMat.transPoint( rw::V3d( -half_Wfar, -half_Hfar, farPlaneDist ) );
-    rw::V3d bfr = cameraWorldMat.transPoint( rw::V3d(  half_Wfar, -half_Hfar, farPlaneDist ) );
-    rw::V3d tfl = cameraWorldMat.transPoint( rw::V3d( -half_Wfar,  half_Hfar, farPlaneDist ) );
-    rw::V3d tfr = cameraWorldMat.transPoint( rw::V3d(  half_Wfar,  half_Hfar, farPlaneDist ) );
-
-    // Construct a view frustum.
-    return math::Quader( corvec( brl ), corvec( brr ), corvec( bfl ), corvec( bfr ), corvec( trl ), corvec( trr ), corvec( tfl ), corvec( tfr ) );
+	return math::Frustum(viewProj);
 }
 
 void World::DepopulateEntities( void )
@@ -100,7 +80,11 @@ void World::PutEntitiesOnGrid( void )
     // Try putting all the world entities on the grid.
     LIST_FOREACH_BEGIN( Entity, this->entityList.root, worldNode )
 
-        this->staticEntityGrid.PutEntity( item );
+		// ignore LODs and transparent models (the latter as there's no depth sorting yet)
+		if (item->GetModelInfo() && item->GetModelInfo()->GetLODDistance() < 300.0f && (item->GetModelInfo()->GetFlags() & 12) == 0)
+		{
+			this->staticEntityGrid.PutEntity(item);
+		}
 
     LIST_FOREACH_END
 }
@@ -140,7 +124,7 @@ void World::RenderWorld( void *gfxDevice )
 
     assert( testCamera != NULL );
 
-    testCamera->farPlane = 600.0f;
+    testCamera->farPlane = 2000.0f;
     testCamera->nearPlane = 1.0f;
     //testCamera->projection = rw::Camera::PERSPECTIVE;
 
@@ -166,7 +150,7 @@ void World::RenderWorld( void *gfxDevice )
 
     {
 		rw::V3d cameraPosition(500.0f, 50.0f, 100.0f);
-		rw::V3d objectPosition(0.0f, 0.0f, 100.0f);
+		rw::V3d objectPosition(0.0f, 0.0f, 0.0f);
 
 		rw::Frame* frame = testCamera->getFrame();
 
@@ -186,19 +170,19 @@ void World::RenderWorld( void *gfxDevice )
 
 	rw::Matrix viewmat;
 	rw::Matrix::invert(&viewmat, testCamera->getFrame()->getLTM());
-	//viewmat.right.x = -viewmat.right.x;
+	viewmat.right.x = -viewmat.right.x;
 	viewmat.rightw = 0.0;
-	//viewmat.up.x = -viewmat.up.x;
+	viewmat.up.x = -viewmat.up.x;
 	viewmat.upw = 0.0;
-	//viewmat.at.x = -viewmat.at.x;
+	viewmat.at.x = -viewmat.at.x;
 	viewmat.atw = 0.0;
-	//viewmat.pos.x = -viewmat.pos.x;
+	viewmat.pos.x = -viewmat.pos.x;
 	viewmat.posw = 1.0;
 	device->SetTransform(D3DTS_VIEW, (D3DMATRIX*)&viewmat);
 	device->SetTransform(D3DTS_PROJECTION, (D3DMATRIX*)testCamera->projMat);
 
     // Get its frustum.
-    math::Quader frustum = getCameraFrustum( testCamera, fov_angle );
+    math::Frustum frustum = getCameraFrustum( testCamera, fov_angle );
 
     streaming::StreamMan& streaming = theGame->GetStreaming();
 

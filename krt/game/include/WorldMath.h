@@ -64,6 +64,59 @@ private:
     rw::Matrix rearPlane_inv_planeSpace_bottom, rearPlane_inv_planeSpace_top;
 };
 
+// this is actually a plane. get your air miles today!
+struct SimplePlane
+{
+	inline SimplePlane()
+		: normal(0.0f, 0.0f, 0.0f), dist(0.0f)
+	{
+
+	}
+
+	inline SimplePlane(rw::V3d normal, float dist)
+		: normal(normal), dist(dist)
+	{
+
+	}
+
+	inline SimplePlane(float a, float b, float c, float d)
+		: SimplePlane(rw::V3d(a, b, c), d)
+	{
+
+	}
+
+	inline void normalize()
+	{
+		float factor = 1.0f / rw::length(normal);
+
+		normal.x *= factor;
+		normal.y *= factor;
+		normal.z *= factor;
+		dist *= factor;
+	}
+
+	rw::V3d normal;
+	float dist;
+};
+
+struct Frustum
+{
+	Frustum(const rw::Matrix& matrix);
+
+	bool isPointInside(const rw::V3d& point) const;
+
+	// assumes it's axis-aligned, silly Martin with his weird 'ingenuity'
+	bool intersectWith(const Quader& right) const;
+	bool intersectWith(const Sphere& right) const;
+
+public:
+	SimplePlane planes[6];
+	rw::V3d corners[8];
+
+private:
+	void createCorners();
+};
+
 // A function to test our math.
 // Should succeed, eh.
 void Tests( void );

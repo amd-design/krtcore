@@ -2032,6 +2032,141 @@ inline bool Sphere::intersectLine( const rw::V3d& pos, const rw::V3d& dir, doubl
     return intersectSphereWithLine( dir, pos, this->point, this->radius, first, second );
 }
 
+Frustum::Frustum(const rw::Matrix& matrix)
+{
+	planes[0] = SimplePlane(-matrix.right.z, -matrix.up.z, -matrix.at.z, -matrix.pos.z);
+	planes[1] = SimplePlane(matrix.right.z - matrix.rightw, matrix.up.z - matrix.upw, matrix.at.z - matrix.atw, matrix.pos.z - matrix.posw);
+	planes[2] = SimplePlane(-matrix.rightw - matrix.right.x, -matrix.upw - matrix.up.x, -matrix.atw - matrix.at.x, -matrix.posw - matrix.pos.x);
+	planes[3] = SimplePlane(matrix.right.x - matrix.rightw, matrix.up.x - matrix.upw, matrix.at.x - matrix.atw, matrix.pos.x - matrix.posw);
+	planes[4] = SimplePlane(matrix.right.y - matrix.rightw, matrix.up.y - matrix.upw, matrix.at.y - matrix.atw, matrix.pos.y - matrix.posw);
+	planes[5] = SimplePlane(-matrix.rightw - matrix.right.y, -matrix.upw - matrix.up.y, -matrix.atw - matrix.at.y, -matrix.posw - matrix.pos.y);
+
+	planes[0].normalize();
+	planes[1].normalize();
+	planes[2].normalize();
+	planes[3].normalize();
+	planes[4].normalize();
+	planes[5].normalize();
+
+	createCorners();
+}
+
+static rw::V3d IntersectionPoint(const SimplePlane& a, const SimplePlane& b, const SimplePlane& c)
+{
+	rw::V3d v1, v2, v3;
+	rw::V3d cross;
+
+	float f;
+
+	cross = rw::cross(b.normal, c.normal);
+
+	f = rw::dot(a.normal, cross);
+	f *= -1.0f;
+
+	v1 = rw::scale(cross, a.dist);
+
+	cross = rw::cross(c.normal, a.normal);
+	v2 = rw::scale(cross, b.dist);
+
+	cross = rw::cross(a.normal, b.normal);
+	v3 = rw::scale(cross, c.dist);
+
+	return rw::V3d(
+		(v1.x + v2.x + v3.x) / f,
+		(v1.y + v2.y + v3.y) / f,
+		(v1.z + v2.z + v3.z) / f
+	);
+}
+
+void Frustum::createCorners()
+{
+	corners[0] = IntersectionPoint(planes[0], planes[2], planes[4]);
+	corners[1] = IntersectionPoint(planes[0], planes[3], planes[4]);
+	corners[2] = IntersectionPoint(planes[0], planes[3], planes[5]);
+	corners[3] = IntersectionPoint(planes[0], planes[2], planes[5]);
+	corners[4] = IntersectionPoint(planes[1], planes[2], planes[4]);
+	corners[5] = IntersectionPoint(planes[1], planes[3], planes[4]);
+	corners[6] = IntersectionPoint(planes[1], planes[3], planes[5]);
+	corners[7] = IntersectionPoint(planes[1], planes[2], planes[5]);
+}
+
+bool Frustum::isPointInside(const rw::V3d& point) const
+{
+	for (size_t i : irange<size_t>(6))
+	{
+		if ((rw::dot(point, planes[i].normal) + planes[i].dist) <= 0)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool Frustum::intersectWith(const Sphere& right) const
+{
+	for (size_t i : irange<size_t>(6))
+	{
+		if ((rw::dot(planes[i].normal, right.point) + planes[i].dist) > right.radius)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool Frustum::intersectWith(const Quader& right) const
+{
+	for (size_t i : irange<size_t>(6))
+	{
+		rw::V3d posVert;
+		rw::V3d negVert;
+
+		if (planes[i].normal.x >= 0)
+		{
+			posVert.x = right.tfr.x;
+			negVert.x = right.brl.x;
+		}
+		else
+		{
+			posVert.x = right.brl.x;
+			negVert.x = right.tfr.x;
+		}
+
+		if (planes[i].normal.y >= 0)
+		{
+			posVert.y = right.tfr.y;
+			negVert.y = right.brl.y;
+		}
+		else
+		{
+			posVert.y = right.brl.y;
+			negVert.y = right.tfr.y;
+		}
+
+		if (planes[i].normal.z >= 0)
+		{
+			posVert.z = right.tfr.z;
+			negVert.z = right.brl.z;
+		}
+		else
+		{
+			posVert.z = right.brl.z;
+			negVert.z = right.tfr.z;
+		}
+
+		float distance = rw::dot(planes[i].normal, negVert) + planes[i].dist;
+
+		if (distance > 0.0f)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
 // A cool testing thing, meow.
 void Tests( void )
 {
