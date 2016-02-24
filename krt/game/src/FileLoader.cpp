@@ -517,34 +517,6 @@ struct sa_iplInstance_t
 	int lodIndex; // 36, index inside of the .ipl file pointing at the LOD instance.
 };
 
-// Code from MTA.
-static void QuatToMatrix(const rw::Quat& q, rw::Matrix& m)
-{
-	float xx = q.x * q.x;
-	float xy = q.x * q.y;
-	float xz = q.x * q.z;
-	float xw = q.x * q.w;
-
-	float yy = q.y * q.y;
-	float yz = q.y * q.z;
-	float yw = q.y * q.w;
-
-	float zz = q.z * q.z;
-	float zw = q.z * q.w;
-
-	m.right.x = 1.0f - 2.0f * (yy + zz);
-	m.right.y = 2.0f * (xy - zw);
-	m.right.z = 2.0f * (xz + yw);
-
-	m.up.x = 2.0f * (xy + zw);
-	m.up.y = 1.0f - 2.0f * (xx + zz);
-	m.up.z = 2.0f * (yz - xw);
-
-	m.at.x = 2.0f * (xz - yw);
-	m.at.y = 2.0f * (yz + xw);
-	m.at.z = 1.0f - 2.0f * (xx + yy);
-}
-
 struct inst_section_manager
 {
 	inline void RegisterGTA3Instance(
@@ -566,9 +538,7 @@ struct inst_section_manager
 
 		// Assign the matrix.
 		{
-			rw::Matrix instMatrix;
-
-			QuatToMatrix(rotation, instMatrix);
+			rw::Matrix instMatrix = rw::Matrix::makeRotation( rotation );
 
 			instMatrix.rightw = 0;
 			instMatrix.atw    = 0;
@@ -580,6 +550,8 @@ struct inst_section_manager
 		}
 
 		resultEntity->interiorId = areaCode;
+
+        resultEntity->isStaticWorldEntity = true;
 
 		// Register this instance entity.
 		// Note that we have no support for LOD instances here.
@@ -613,9 +585,7 @@ struct inst_section_manager
 
 		// Convert the Quat to a matrix and assign it.
 		{
-			rw::Matrix instMatrix;
-
-			QuatToMatrix(instData.quatRotation, instMatrix);
+			rw::Matrix instMatrix = rw::Matrix::makeRotation( instData.quatRotation );
 
 			instMatrix.rightw = 0;
 			instMatrix.atw    = 0;
@@ -648,6 +618,8 @@ struct inst_section_manager
 		}
 
 		resultEntity->interiorId = instData.areaIndex;
+
+        resultEntity->isStaticWorldEntity = true;
 
 		// Register this instance entity.
 		lod_inst_entity inst_info;
