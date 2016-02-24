@@ -56,8 +56,8 @@ void World::PutEntitiesOnGrid( void )
     // Try putting all the world entities on the grid.
     LIST_FOREACH_BEGIN( Entity, this->entityList.root, worldNode )
 
-		// ignore LODs and transparent models (the latter as there's no depth sorting yet)
-		if (item->GetModelInfo() && item->GetModelInfo()->GetLODDistance() < 300.0f && (item->GetModelInfo()->GetFlags() & 12) == 0)
+		// ignore LODs
+		if (item->GetModelInfo() && item->GetModelInfo()->GetLODDistance() < 300.0f)
 		{
 			this->staticEntityGrid.PutEntity(item);
 		}

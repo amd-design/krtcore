@@ -105,7 +105,10 @@ void Camera::BeginUpdate( void *gpuContext )
 	device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
 	device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
 	device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
-	device->SetRenderState(D3DRS_ALPHABLENDENABLE, 1);
+	device->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
+	device->SetRenderState(D3DRS_ALPHATESTENABLE, 1);
+	device->SetRenderState(D3DRS_ALPHAREF, 128);
+	device->SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATEREQUAL);
 	device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
 
     // Set projection stuff.
