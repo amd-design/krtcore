@@ -2167,6 +2167,84 @@ bool Frustum::intersectWith(const Quader& right) const
 	return true;
 }
 
+// Matrix stuff.
+void MatrixToEulerRad( const rw::Matrix& mat, float& x_rad, float& y_rad, float& z_rad )
+{
+    const rw::V3d& vRight = mat.right;
+    const rw::V3d& vFront = mat.up;
+    const rw::V3d& vUp = mat.at;
+
+    if ( vRight.y == 1 )
+    {
+        z_rad = (float)( M_PI / 2 );
+
+        x_rad = 0;
+        y_rad = (float)atan2( vRight.x, vRight.y );
+    }
+    else if ( vRight.z == -1 )
+    {
+        z_rad = -(float)( M_PI / 2 );
+
+        x_rad = -0;
+        y_rad = (float)atan2( vRight.x, vRight.y );
+    }
+    else
+    {
+        z_rad = asin( vRight.z );
+
+        x_rad = (float)atan2( -vFront.z, vUp.z );
+        y_rad = (float)atan2( -vRight.y, vRight.x );
+    }
+}
+
+void EulerToMatrix( rw::Matrix& mat, float x_angle, float y_angle, float z_angle )
+{
+    EulerRadToMatrix( mat, DEG2RAD( x_angle ), DEG2RAD( y_angle ), DEG2RAD( z_angle ) );
+}
+
+void MatrixToEuler( const rw::Matrix& mat, float& x_angle, float& y_angle, float& z_angle )
+{
+    float x_rad, y_rad, z_rad;
+
+    MatrixToEulerRad( mat, x_rad, y_rad, z_rad );
+
+    x_angle = RAD2DEG( x_rad );
+    y_angle = RAD2DEG( y_rad );
+    z_angle = RAD2DEG( z_rad );
+}
+
+void EulerRadToMatrix( rw::Matrix& mat, float x_rad, float y_rad, float z_rad )
+{
+    typedef float numberType;
+
+    auto ch = cos( x_rad );
+    auto sh = sin( x_rad );
+    auto cb = cos( z_rad );
+    auto sb = sin( z_rad );
+    auto ca = cos( y_rad );
+    auto sa = sin( y_rad );
+
+    rw::V3d& vRight = mat.right;
+    rw::V3d& vFront = mat.up;
+    rw::V3d& vUp = mat.at;
+
+    mat.rightw = 0.0f;
+    mat.upw = 0.0f;
+    mat.atw = 0.0f;
+
+    vRight.x = (numberType)( ca * cb );
+    vRight.y = (numberType)( -sa * cb );
+    vRight.z = (numberType)( sb );
+
+    vFront.x = (numberType)( ca * sb * sh + sa * ch );
+    vFront.y = (numberType)( ca * ch - sa * sb * sh );
+    vFront.z = (numberType)( -sh * cb );
+
+    vUp.x = (numberType)( sa * sh - ca * sb * ch );
+    vUp.y = (numberType)( sa * sb * ch + ca * sh );
+    vUp.z = (numberType)( ch * cb );
+}
+
 // A cool testing thing, meow.
 void Tests( void )
 {

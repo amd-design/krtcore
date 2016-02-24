@@ -2,6 +2,9 @@
 
 // Important math about camera frustum and world sectoring.
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 #define MATH_INLINE __forceinline
 
 //#define USE_MATH_VERIFICATION
@@ -116,6 +119,18 @@ public:
 private:
 	void createCorners();
 };
+
+// Helpers for Euler Angles.
+#define DEG2RAD( x ) (x*M_PI/180)
+#define RAD2DEG( x ) (x/M_PI*180)
+
+// Nice utility functions, meow.
+void MatrixToEulerRad( const rw::Matrix& mat, float& x_rad, float& y_rad, float& z_rad );
+void EulerRadToMatrix( rw::Matrix& mat, float x_rad, float y_rad, float z_rad );
+
+// Helpers.
+void MatrixToEuler( const rw::Matrix& mat, float& x_angle, float& y_angle, float& z_angle );
+void EulerToMatrix( rw::Matrix& mat, float x_angle, float y_angle, float z_angle );
 
 // A function to test our math.
 // Should succeed, eh.
