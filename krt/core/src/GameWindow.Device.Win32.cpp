@@ -48,6 +48,7 @@ void* InitializeD3D(HWND hWnd, int width, int height)
 
 	// store device
 	rw::d3d::device = devicePtr;
+	rw::d3d::isP8supported = false;
 
 	return devicePtr;
 }
