@@ -11,7 +11,7 @@
 
 #include <Console.VariableHelpers.h>
 
-#pragma warning(disable:4996)
+#pragma warning(disable : 4996)
 
 namespace krt
 {
@@ -517,6 +517,11 @@ struct sa_iplInstance_t
 	int lodIndex; // 36, index inside of the .ipl file pointing at the LOD instance.
 };
 
+inline rw::Quat gta_quat_to_rw(const rw::Quat& rotation)
+{
+	return rw::Quat(rotation.w, -rotation.x, -rotation.y, -rotation.z);
+}
+
 struct inst_section_manager
 {
 	inline void RegisterGTA3Instance(
@@ -526,19 +531,21 @@ struct inst_section_manager
 	    rw::V3d scale,
 	    rw::Quat rotation)
 	{
+		streaming::ident_t universeModelIndex = g_currentParseUniverse->GetModelIndexMapping(modelID);
+
 		// I have no actual idea how things are made exactly, but lets just register it somehow.
-		ModelManager::ModelResource* modelInfo = theGame->GetModelManager().GetModelByID(g_currentParseUniverse->GetModelIndexMapping(modelID));
+		ModelManager::ModelResource* modelInfo = theGame->GetModelManager().GetModelByID(universeModelIndex);
 
 		if (!modelInfo)
 			return;
 
 		Entity* resultEntity = new Entity(theGame);
 
-		resultEntity->SetModelIndex(modelInfo->GetID());
+		resultEntity->SetModelIndex(universeModelIndex);
 
 		// Assign the matrix.
 		{
-			rw::Matrix instMatrix = rw::Matrix::makeRotation( rotation );
+			rw::Matrix instMatrix = rw::Matrix::makeRotation(gta_quat_to_rw(rotation));
 
 			instMatrix.rightw = 0;
 			instMatrix.atw    = 0;
@@ -551,7 +558,7 @@ struct inst_section_manager
 
 		resultEntity->interiorId = areaCode;
 
-        resultEntity->isStaticWorldEntity = true;
+		resultEntity->isStaticWorldEntity = true;
 
 		// Register this instance entity.
 		// Note that we have no support for LOD instances here.
@@ -564,7 +571,9 @@ struct inst_section_manager
 
 	inline void RegisterBinarySAInstance(sa_iplInstance_t& instData)
 	{
-		ModelManager::ModelResource* modelInfo = theGame->GetModelManager().GetModelByID(g_currentParseUniverse->GetModelIndexMapping(instData.modelIndex));
+		streaming::ident_t universeModelIndex = g_currentParseUniverse->GetModelIndexMapping(instData.modelIndex);
+
+		ModelManager::ModelResource* modelInfo = theGame->GetModelManager().GetModelByID(universeModelIndex);
 
 		if (!modelInfo)
 			return;
@@ -578,14 +587,14 @@ struct inst_section_manager
 
 			resultEntity = new Entity(theGame);
 
-			resultEntity->SetModelIndex(instData.modelIndex);
+			resultEntity->SetModelIndex(universeModelIndex);
 
 			// dont write z buffer flag?
 		}
 
 		// Convert the Quat to a matrix and assign it.
 		{
-			rw::Matrix instMatrix = rw::Matrix::makeRotation( instData.quatRotation );
+			rw::Matrix instMatrix = rw::Matrix::makeRotation(gta_quat_to_rw(instData.quatRotation));
 
 			instMatrix.rightw = 0;
 			instMatrix.atw    = 0;
@@ -619,7 +628,7 @@ struct inst_section_manager
 
 		resultEntity->interiorId = instData.areaIndex;
 
-        resultEntity->isStaticWorldEntity = true;
+		resultEntity->isStaticWorldEntity = true;
 
 		// Register this instance entity.
 		lod_inst_entity inst_info;
@@ -657,31 +666,35 @@ struct inst_section_manager
 			baseEntity->LinkToWorld(theGame->GetWorld());
 		}
 
-		// If certain entities have LOD "models" and their entities do not have lod LODs already.
-		// Then automatically create lower LODs for them.
-		for (const lod_inst_entity& inst : this->instances)
+		// Only do this if we are running gtasa.
+		if (g_currentParseUniverse->GetConfiguration().gameName == "gtasa")
 		{
-			Entity* entity = inst.entity;
-
-			if (entity->GetLODEntity() == NULL)
+			// If certain entities have LOD "models" and their entities do not have lod LODs already.
+			// Then automatically create lower LODs for them.
+			for (const lod_inst_entity& inst : this->instances)
 			{
-				ModelManager::ModelResource* modelEntry = entity->GetModelInfo();
+				Entity* entity = inst.entity;
 
-				if (modelEntry)
+				if (entity->GetLODEntity() == NULL)
 				{
-					ModelManager::ModelResource* lodModel = modelEntry->GetLODModel();
+					ModelManager::ModelResource* modelEntry = entity->GetModelInfo();
 
-					if (lodModel)
+					if (modelEntry)
 					{
-						// Actually create an automatic LOD instance placed at the exact same position.
-						Entity* lodInst = new Entity(entity->GetGame());
+						ModelManager::ModelResource* lodModel = modelEntry->GetLODModel();
 
-						lodInst->SetModelIndex(lodModel->GetID());
-						lodInst->SetModelling(entity->GetModelling());
+						if (lodModel)
+						{
+							// Actually create an automatic LOD instance placed at the exact same position.
+							Entity* lodInst = new Entity(entity->GetGame());
 
-						entity->SetLODEntity(lodInst);
+							lodInst->SetModelIndex(lodModel->GetID());
+							lodInst->SetModelling(entity->GetModelling());
 
-						lodInst->LinkToWorld(theGame->GetWorld());
+							entity->SetLODEntity(lodInst);
+
+							lodInst->LinkToWorld(theGame->GetWorld());
+						}
 					}
 				}
 			}
