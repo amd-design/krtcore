@@ -8,6 +8,9 @@
 #include "Console.CommandHelpers.h"
 
 #include "Camera.h"
+#include "CameraControls.h"
+
+#include "sys/Timer.h"
 
 namespace krt
 {
@@ -33,8 +36,6 @@ World::~World( void )
 }
 
 // TODO: add more cool world stuff.
-
-#define DEG2RAD( x ) (x*3.14159265/180)
 
 inline rw::V3d corvec( rw::V3d rwvec )
 {
@@ -105,19 +106,50 @@ void World::RenderWorld( void *gfxDevice )
 		rw::V3d objectPosition(0.0f, 0.0f, 0.0f);
 #endif
 
-		rw::V3d forward = rw::normalize(rw::sub(objectPosition, cameraPosition));
-		rw::V3d left = rw::normalize(rw::cross(rw::V3d(0.0f, 0.0f, 1.0f), forward));
-		rw::V3d up = rw::cross(forward, left);
+        static bool hasInitializedWorldCam = false;
 
-        rw::Matrix viewMat;
-        viewMat.setIdentity();
+        if ( !hasInitializedWorldCam )
+        {
+            worldCam.SetFarClip( 1150 );
 
-		viewMat.right = left;
-		viewMat.up = up;
-		viewMat.at = forward;
-		viewMat.pos = cameraPosition;
-		
-        worldCam.SetViewMatrix( viewMat );
+		    rw::V3d forward = rw::normalize(rw::sub(objectPosition, cameraPosition));
+		    rw::V3d left = rw::normalize(rw::cross(rw::V3d(0.0f, 0.0f, 1.0f), forward));
+		    rw::V3d up = rw::cross(forward, left);
+
+            rw::Matrix viewMat;
+            viewMat.setIdentity();
+
+		    viewMat.right = left;
+		    viewMat.up = up;
+		    viewMat.at = forward;
+		    viewMat.pos = cameraPosition;
+
+            worldCam.SetViewMatrix( viewMat );
+
+            hasInitializedWorldCam = true;
+        }
+
+#if 1
+        // Do a little test, meow.
+        uint64_t cur_time = sys::Milliseconds();
+
+        unsigned int cur_divisor = ( ( cur_time / 500 ) % 2 );
+
+        static EditorCameraControls editorControls;
+
+        editorControls.SetYawVelocity( 40 );
+
+        if ( cur_divisor == 0 )
+        {
+            editorControls.SetPitchVelocity( 40 );
+        }
+        else if ( cur_divisor == 1 )
+        {
+            editorControls.SetPitchVelocity( -40 );
+        }
+
+        editorControls.OnFrame( &worldCam );
+#endif
     }
 
     // Begin the rendering.

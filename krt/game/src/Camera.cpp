@@ -1,6 +1,8 @@
 #include "StdInc.h"
 #include "Camera.h"
 
+#include "Game.h"
+
 // Camera is responsible for setting up the rendering context.
 #include <windows.h>
 #include <d3d9.h>
@@ -94,6 +96,11 @@ void Camera::BeginUpdate( void *gpuContext )
     if ( this->isRendering )
         return;
 
+    // Make sure no other camera is active.
+    assert( theGame->GetActiveCamera() == NULL );
+
+    theGame->SetActiveCamera( this );
+
 	// perform rendering
 	IDirect3DDevice9* device = reinterpret_cast<IDirect3DDevice9*>(gpuContext);
 
@@ -138,6 +145,10 @@ void Camera::EndUpdate( void )
 
     if ( !this->isRendering )
         return;
+    
+    assert( theGame->GetActiveCamera() == this );
+
+    // TODO: maybe we want to make this more beautiful.
 
     // Finish rendering and present.
 	IDirect3DDevice9* device = reinterpret_cast<IDirect3DDevice9*>( this->rendering_context );
@@ -150,6 +161,8 @@ void Camera::EndUpdate( void )
     this->rendering_context = NULL;
 
     this->isRendering = false;
+
+    theGame->SetActiveCamera( NULL );
 }
 
 void Camera::SetFOV( float fov_radians )

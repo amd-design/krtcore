@@ -2199,7 +2199,7 @@ void MatrixToEulerRad( const rw::Matrix& mat, float& x_rad, float& y_rad, float&
 
 void EulerToMatrix( rw::Matrix& mat, float x_angle, float y_angle, float z_angle )
 {
-    EulerRadToMatrix( mat, DEG2RAD( x_angle ), DEG2RAD( y_angle ), DEG2RAD( z_angle ) );
+    EulerRadToMatrix( mat, (float)DEG2RAD( x_angle ), (float)DEG2RAD( y_angle ), (float)DEG2RAD( z_angle ) );
 }
 
 void MatrixToEuler( const rw::Matrix& mat, float& x_angle, float& y_angle, float& z_angle )
@@ -2208,9 +2208,9 @@ void MatrixToEuler( const rw::Matrix& mat, float& x_angle, float& y_angle, float
 
     MatrixToEulerRad( mat, x_rad, y_rad, z_rad );
 
-    x_angle = RAD2DEG( x_rad );
-    y_angle = RAD2DEG( y_rad );
-    z_angle = RAD2DEG( z_rad );
+    x_angle = (float)RAD2DEG( x_rad );
+    y_angle = (float)RAD2DEG( y_rad );
+    z_angle = (float)RAD2DEG( z_rad );
 }
 
 void EulerRadToMatrix( rw::Matrix& mat, float x_rad, float y_rad, float z_rad )

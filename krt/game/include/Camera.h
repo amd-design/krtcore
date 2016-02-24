@@ -35,6 +35,9 @@ public:
     math::Frustum GetSimpleFrustum( void ) const;
     math::Quader GetComplexFrustum( void ) const;
 
+    rw::Frame* GetRWFrame( void )               { return this->camFrame; }
+    rw::Camera* GetRWCamera( void )             { return this->rwCamera; }
+
 private:
     bool isRendering;
     void *rendering_context;

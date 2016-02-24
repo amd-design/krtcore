@@ -51,6 +51,9 @@ class Game
 
 	Camera& GetWorldCamera(void) { return this->worldCam; }
 
+    void SetActiveCamera( Camera *theCamera )           { this->activeCam = theCamera; }
+    Camera* GetActiveCamera( void )                     { return this->activeCam; }
+
   private:
 	void MountUserDirectory();
 
@@ -80,6 +83,8 @@ class Game
 	float timescale;
 
 	Camera worldCam; // camera to render the main world in
+
+    Camera *activeCam;
 
   private:
 	std::unique_ptr<ConVar<int>> maxFPSVariable;
