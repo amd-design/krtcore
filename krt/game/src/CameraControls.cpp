@@ -166,6 +166,24 @@ void EditorCameraControls::OnFrame( Camera *camera )
     camera->SetViewMatrix( camView );
 }
 
+void EditorCameraControls::AddViewAngles( Camera* camera, float yaw, float pitch )
+{
+	rw::Matrix camView = camera->GetViewMatrix();
+
+	if (yaw != 0 || pitch != 0)
+	{
+		float cur_yaw, cur_pitch;
+		matrix_get_yaw_pitch(camView, cur_yaw, cur_pitch);
+
+		// Make sure we do not go overboard, so limit pitch.
+		float new_pitch = std::max(-89.0f, std::min(89.0f, (float)(cur_pitch + pitch)));
+
+		matrix_from_yaw_pitch(camView, cur_yaw + yaw, new_pitch);
+	}
+
+	camera->SetViewMatrix(camView);
+}
+
 void EditorCameraControls::SetAccelerationTime( unsigned int time )
 {
     this->front_velo.SetAccelerationInterval( time );

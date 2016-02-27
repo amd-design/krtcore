@@ -39,12 +39,23 @@ public:
 void KeyEvent::Handle()
 {
 	g_bindings->HandleKeyEvent(this);
+
+	EventListener<KeyEvent>::Handle(this);
 }
 
 void CharEvent::Handle()
 {
-
+	EventListener<CharEvent>::Handle(this);
 }
+
+void MouseEvent::Handle()
+{
+	EventListener<MouseEvent>::Handle(this);
+}
+
+DECLARE_EVENT_LISTENER(KeyEvent)
+DECLARE_EVENT_LISTENER(CharEvent)
+DECLARE_EVENT_LISTENER(MouseEvent)
 
 static void ProcessConsoleInput(EventSystem* eventSystem)
 {

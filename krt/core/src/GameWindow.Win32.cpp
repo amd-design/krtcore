@@ -8,6 +8,7 @@
 #include <Game.h>
 
 #include <windows.h>
+#include <windowsx.h>
 
 namespace krt
 {
@@ -70,7 +71,8 @@ class Win32GameWindow : public GameWindow
 	    : m_widthVar("r_width", ConVar_Archive, defaultWidth, &m_width),
 	      m_heightVar("r_height", ConVar_Archive, defaultHeight, &m_height),
 	      m_fullscreenVar("r_fullscreen", ConVar_Archive, false, &m_fullscreen),
-	      m_eventSystem(eventSystem)
+	      m_eventSystem(eventSystem),
+	      m_active(false)
 	{
 		// prepare resolution
 		HMONITOR hMonitor       = MonitorFromPoint(POINT{0, 0}, 0);
@@ -167,10 +169,41 @@ class Win32GameWindow : public GameWindow
 		}
 	}
 
+	virtual void ProcessEventsOnce() override
+	{
+		if (m_active)
+		{
+			ProcessMouse();
+		}
+	}
+
   private:
+	void ProcessMouse()
+	{
+		POINT centerPoint = {m_width / 2, m_height / 2};
+		ClientToScreen(m_windowHandle, &centerPoint);
+
+		// get mouse position
+		POINT cursorPos;
+		GetCursorPos(&cursorPos);
+
+		// reset to the center point
+		SetCursorPos(centerPoint.x, centerPoint.y);
+
+		// get delta position (from center)
+		int dX = cursorPos.x - centerPoint.x;
+		int dY = cursorPos.y - centerPoint.y;
+
+		// if there's a delta, post a mouse event
+		if (dX != 0 || dY != 0)
+		{
+			m_eventSystem->QueueEvent(std::make_unique<MouseEvent>(dX, dY));
+		}
+	}
+
 	LRESULT WindowProcedure(UINT msg, WPARAM wParam, LPARAM lParam)
 	{
-		int msgTimeDiff = (GetTickCount() - m_msgTime);
+		int msgTimeDiff  = (GetTickCount() - m_msgTime);
 		uint64_t msgTime = theGame->GetGameTime() - msgTimeDiff;
 
 		switch (msg)
@@ -201,6 +234,42 @@ class Win32GameWindow : public GameWindow
 
 			// WM_CHAR events are expected to be wchar_t, at least...
 			m_eventSystem->QueueEvent(std::make_unique<CharEvent>(ToNarrow(std::wstring(&charParam, 1))));
+			break;
+		}
+
+		case WM_ACTIVATEAPP:
+		{
+			m_active = !!wParam;
+
+			if (m_active)
+			{
+				POINT centerPoint = {m_width / 2, m_height / 2};
+				ClientToScreen(m_windowHandle, &centerPoint);
+
+				RECT windowRect;
+				GetWindowRect(m_windowHandle, &windowRect);
+
+				SetCursorPos(centerPoint.x, centerPoint.y);
+
+				SetCapture(m_windowHandle);
+				ClipCursor(&windowRect);
+
+				while (ShowCursor(FALSE) >= 0)
+				{
+					// do nothing
+				}
+			}
+			else
+			{
+				ClipCursor(nullptr);
+				ReleaseCapture();
+
+				while (ShowCursor(TRUE) < 0)
+				{
+					// do nothing
+				}
+			}
+
 			break;
 		}
 
@@ -245,6 +314,7 @@ class Win32GameWindow : public GameWindow
 	bool m_fullscreen;
 
 	uint32_t m_msgTime;
+	bool m_active;
 };
 
 std::map<HWND, Win32GameWindow*> Win32GameWindow::ms_windowMapping;

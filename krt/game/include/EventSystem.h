@@ -252,6 +252,69 @@ class CharEvent : public Event
 	std::string m_character;
 };
 
+class MouseEvent : public Event
+{
+  public:
+	inline MouseEvent(int dX, int dY)
+	    : m_dX(dX), m_dY(dY)
+	{
+	}
+
+	virtual void Handle() override;
+
+	inline int GetDeltaX() const
+	{
+		return m_dX;
+	}
+
+	inline int GetDeltaY() const
+	{
+		return m_dY;
+	}
+
+  private:
+	int m_dX;
+	int m_dY;
+};
+
+template <typename T>
+struct EventListener
+{
+	template <typename TCallback>
+	EventListener(const TCallback& callback)
+	{
+		m_handler = callback;
+
+		ms_listeners.insert(this);
+	}
+
+	~EventListener()
+	{
+		ms_listeners.erase(this);
+	}
+
+  private:
+	std::function<void(const T*)> m_handler;
+
+	// static members
+  public:
+	using TSet = std::set<EventListener*>;
+
+	static void Handle(const T* event)
+	{
+		for (auto& listener : ms_listeners)
+		{
+			listener->m_handler(event);
+		}
+	}
+
+  private:
+	static TSet ms_listeners;
+};
+
+#define DECLARE_EVENT_LISTENER(t) \
+	EventListener<t>::TSet EventListener<t>::ms_listeners;
+
 class EventSystem
 {
   public:

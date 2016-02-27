@@ -163,6 +163,47 @@ void World::RenderWorld( void *gfxDevice )
 		static Button lookUpButton("lookup");
 		static Button lookDownButton("lookdown");
 
+		static ConVar<bool> m_filter("m_filter", ConVar_Archive, false);
+		static ConVar<float> m_sensitivity("sensitivity", ConVar_Archive, 5.0f);
+		static ConVar<float> m_accel("m_accel", ConVar_Archive, 0.0f);
+		static ConVar<float> m_yaw("m_yaw", ConVar_Archive, 0.022f);
+		static ConVar<float> m_pitch("m_pitch", ConVar_Archive, 0.022f);
+
+		static EventListener<MouseEvent> eventListener([] (const MouseEvent* event)
+		{
+			// calculate angle movement
+			float mx = event->GetDeltaX();
+			float my = event->GetDeltaY();
+
+			// historical values for filtering
+			static int mouseDx[2];
+			static int mouseDy[2];
+			static int mouseIndex;
+
+			mouseDx[mouseIndex] = event->GetDeltaX();
+			mouseDy[mouseIndex] = event->GetDeltaY();
+
+			mouseIndex ^= 1;
+
+			// filter input
+			if (m_filter.GetValue())
+			{
+				mx = (mouseDx[0] + mouseDx[1]) * 0.5f;
+				my = (mouseDy[0] + mouseDy[1]) * 0.5f;
+			}
+
+			float rate = rw::length(rw::V2d(mx, my)) / theGame->GetLastFrameTime();
+			float factor = m_sensitivity.GetValue() + (rate * m_accel.GetValue());
+
+			mx *= factor;
+			my *= factor;
+
+			// apply angles to camera
+			krt::Camera& camera = theGame->GetWorldCamera();
+			
+			editorControls.AddViewAngles(&camera, mx * m_yaw.GetValue(), my * -(m_pitch.GetValue()));
+		});
+
 		static std::once_flag bindingFlag;
 
 		std::call_once(bindingFlag, [] ()

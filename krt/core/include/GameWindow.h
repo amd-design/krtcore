@@ -15,6 +15,8 @@ public:
 
 	virtual void ProcessEvents() = 0;
 
+	virtual void ProcessEventsOnce() = 0;
+
 public:
 	static std::unique_ptr<GameWindow> Create(const std::string& title, int defaultWidth, int defaultHeight, EventSystem* eventSystem);
 };

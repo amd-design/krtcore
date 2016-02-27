@@ -135,6 +135,8 @@ void Game::Run()
 
 		uint64_t thisTime = 0;
 
+		gameWindow->ProcessEventsOnce();
+
 		do
 		{
 			thisTime = eventSystem.HandleEvents();

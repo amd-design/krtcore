@@ -14,6 +14,8 @@ struct EditorCameraControls
 
     void OnFrame( Camera *camera );
 
+	void AddViewAngles( Camera* camera, float yaw, float pitch );
+
     void SetAccelerationTime( unsigned int time );
 
     // Velocity manipulation functions.
