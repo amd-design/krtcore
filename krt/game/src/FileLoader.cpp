@@ -536,6 +536,12 @@ struct inst_section_manager
 		// I have no actual idea how things are made exactly, but lets just register it somehow.
 		ModelManager::ModelResource* modelInfo = theGame->GetModelManager().GetModelByID(universeModelIndex);
 
+		// HACK: ignore III island LODs some ugly way
+		if (modelID == 402 || modelID == 403 || modelID == 404 || modelID == 405 || modelID == 416)
+		{
+			return;
+		}
+
 		if (!modelInfo)
 			return;
 

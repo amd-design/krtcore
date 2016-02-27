@@ -56,6 +56,11 @@ struct Entity
 
     void RemoveEntityWorldReference( EntityReference *refPtr );
 
+	inline void ResetChildrenDrawn( void ) { lodChildrenDrawn = 0; }
+	inline void IncrementChildrenDrawn( void ) { lodChildrenDrawn++; }
+
+	inline bool ShouldBeDrawn( void ) { return (lodChildrenCount == 0) ? true : (lodChildrenDrawn != lodChildrenCount); }
+
 private:
     Game *ourGame;
 
@@ -75,6 +80,9 @@ private:
 
     rw::Matrix matrix;
     bool hasLocalMatrix;
+
+	int lodChildrenCount;
+	int lodChildrenDrawn;
 
     rw::Object *rwObject;
 

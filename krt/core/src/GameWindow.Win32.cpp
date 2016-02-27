@@ -5,6 +5,8 @@
 
 #include <EventSystem.h>
 
+#include <Game.h>
+
 #include <windows.h>
 
 namespace krt
@@ -158,6 +160,8 @@ class Win32GameWindow : public GameWindow
 
 		while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE) != 0)
 		{
+			m_msgTime = msg.time;
+
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
@@ -166,17 +170,30 @@ class Win32GameWindow : public GameWindow
   private:
 	LRESULT WindowProcedure(UINT msg, WPARAM wParam, LPARAM lParam)
 	{
+		int msgTimeDiff = (GetTickCount() - m_msgTime);
+		uint64_t msgTime = theGame->GetGameTime() - msgTimeDiff;
+
 		switch (msg)
 		{
 		case WM_KEYDOWN:
 		case WM_SYSKEYDOWN:
-			m_eventSystem->QueueEvent(std::make_unique<KeyEvent>(true, MapKeyCode(lParam)));
+		{
+			auto event = std::make_unique<KeyEvent>(true, MapKeyCode(lParam));
+			event->SetTime(msgTime);
+
+			m_eventSystem->QueueEvent(std::move(event));
 			break;
+		}
 
 		case WM_KEYUP:
 		case WM_SYSKEYUP:
-			m_eventSystem->QueueEvent(std::make_unique<KeyEvent>(false, MapKeyCode(lParam)));
+		{
+			auto event = std::make_unique<KeyEvent>(false, MapKeyCode(lParam));
+			event->SetTime(msgTime);
+
+			m_eventSystem->QueueEvent(std::move(event));
 			break;
+		}
 
 		case WM_CHAR:
 		{
@@ -226,6 +243,8 @@ class Win32GameWindow : public GameWindow
 	int m_height;
 
 	bool m_fullscreen;
+
+	uint32_t m_msgTime;
 };
 
 std::map<HWND, Win32GameWindow*> Win32GameWindow::ms_windowMapping;

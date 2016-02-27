@@ -32,6 +32,8 @@ public:
 
 	void SaveConfigurationIfNeeded(const std::string& path);
 
+	void SetVariableModifiedFlags(int flags);
+
 	inline ConsoleCommandManager* GetCommandManager()
 	{
 		return m_commandManager.get();
@@ -49,6 +51,8 @@ public:
 
 private:
 	Context* m_fallbackContext;
+
+	int m_variableModifiedFlags;
 
 	std::unique_ptr<ConsoleCommandManager> m_commandManager;
 
@@ -72,5 +76,7 @@ void AddToBuffer(const std::string& text);
 void ExecuteBuffer();
 
 void SaveConfigurationIfNeeded(const std::string& path);
+
+void SetVariableModifiedFlags(int flags);
 }
 }

@@ -33,7 +33,10 @@ Entity::Entity( Game *ourGame )
 
     this->onWorld = NULL;   // we are not part of a world.
 
-    this->cachedBoundSphereRadius = 300.0f; // TODO: cache the real bounding sphere radius in some file so we dont need the model
+    this->cachedBoundSphereRadius = 400.0f; // TODO: cache the real bounding sphere radius in some file so we dont need the model
+
+	this->lodChildrenCount = 0;
+	this->lodChildrenDrawn = 0;
 }
 
 Entity::~Entity( void )
@@ -388,6 +391,7 @@ void Entity::SetLODEntity( Entity *lodInst )
 
         this->lowerQualityEntity = lodInst;
 
+		lodInst->lodChildrenCount++;
         lodInst->higherQualityEntity = this;
     }
 }

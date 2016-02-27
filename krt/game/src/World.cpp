@@ -10,7 +10,7 @@
 #include "Camera.h"
 #include "CameraControls.h"
 
-#include "sys/Timer.h"
+#include "KeyBinding.h"
 
 namespace krt
 {
@@ -58,7 +58,7 @@ void World::PutEntitiesOnGrid( void )
     LIST_FOREACH_BEGIN( Entity, this->entityList.root, worldNode )
 
 		// ignore LODs
-		if (item->GetModelInfo() && item->GetModelInfo()->GetLODDistance() < 300.0f)
+		//if (item->GetModelInfo() && item->GetModelInfo()->GetLODDistance() < 300.0f)
 		{
 			this->staticEntityGrid.PutEntity(item);
 		}
@@ -110,7 +110,7 @@ void World::RenderWorld( void *gfxDevice )
 
         if ( !hasInitializedWorldCam )
         {
-            worldCam.SetFarClip( 1150 );
+            worldCam.SetFarClip( 2150 );
 
 		    rw::V3d forward = rw::normalize(rw::sub(objectPosition, cameraPosition));
 		    rw::V3d left = rw::normalize(rw::cross(rw::V3d(0.0f, 0.0f, 1.0f), forward));
@@ -129,9 +129,9 @@ void World::RenderWorld( void *gfxDevice )
             hasInitializedWorldCam = true;
         }
 
-#if 1
+#if 0
         // Do a little test, meow.
-        uint64_t cur_time = sys::Milliseconds();
+        uint64_t cur_time = theGame->GetGameTime();
 
         unsigned int cur_divisor = ( ( cur_time / 500 ) % 2 );
 
@@ -150,6 +150,64 @@ void World::RenderWorld( void *gfxDevice )
 
         editorControls.OnFrame( &worldCam );
 #endif
+
+#if 1
+		static EditorCameraControls editorControls;
+
+		static Button forwardButton("forward");
+		static Button backButton("back");
+		static Button moveLeftButton("moveleft");
+		static Button moveRightButton("moveright");
+		static Button lookLeftButton("lookleft");
+		static Button lookRightButton("lookright");
+		static Button lookUpButton("lookup");
+		static Button lookDownButton("lookdown");
+
+		static std::once_flag bindingFlag;
+
+		std::call_once(bindingFlag, [] ()
+		{
+			console::ExecuteSingleCommand(ProgramArguments{ "bind", "W", "+forward" });
+			console::ExecuteSingleCommand(ProgramArguments{ "bind", "S", "+back" });
+			console::ExecuteSingleCommand(ProgramArguments{ "bind", "A", "+moveleft" });
+			console::ExecuteSingleCommand(ProgramArguments{ "bind", "D", "+moveright" });
+			console::ExecuteSingleCommand(ProgramArguments{ "bind", "Up", "+lookup" });
+			console::ExecuteSingleCommand(ProgramArguments{ "bind", "Down", "+lookdown" });
+			console::ExecuteSingleCommand(ProgramArguments{ "bind", "Left", "+lookleft" });
+			console::ExecuteSingleCommand(ProgramArguments{ "bind", "Right", "+lookright" });
+		});
+
+		auto bindButton = [&] (const Button& addButton, const Button& subButton, auto& setFunction, auto& stopFunction, float speed)
+		{
+			if (addButton.IsDown())
+			{
+				setFunction(speed * addButton.GetPressedFraction());
+			}
+			else if (subButton.IsDown())
+			{
+				setFunction(-speed * subButton.GetPressedFraction());
+			}
+			else
+			{
+				stopFunction();
+			}
+		};
+
+#define BUTTON_MACRO(b, sb, n, s) \
+	bindButton(b, sb, std::bind(&EditorCameraControls::Set##n, &editorControls, std::placeholders::_1), std::bind(&EditorCameraControls::Stop##n, &editorControls), s)
+
+		BUTTON_MACRO(forwardButton, backButton, FrontVelocity, 30.0f);
+
+		BUTTON_MACRO(moveLeftButton, moveRightButton, RightVelocity, 30.0f);
+
+		BUTTON_MACRO(lookRightButton, lookLeftButton, YawVelocity, 18.0f);
+
+		BUTTON_MACRO(lookUpButton, lookDownButton, PitchVelocity, 10.0f);
+
+#undef BUTTON_MACRO
+
+		editorControls.OnFrame(&worldCam);
+#endif
     }
 
     // Begin the rendering.
@@ -158,10 +216,21 @@ void World::RenderWorld( void *gfxDevice )
     // Get its frustum.
     // For now it does not matter which; both promise that things that should be visible are indeed visible.
     // The difference is that the complex frustum culls away more objects than the simple frustum.
-    //math::Frustum frustum = worldCam.GetSimpleFrustum();
-    math::Quader frustum = worldCam.GetComplexFrustum();
+    math::Frustum frustum = worldCam.GetSimpleFrustum();
+    //math::Quader frustum = worldCam.GetComplexFrustum();
 
     streaming::StreamMan& streaming = theGame->GetStreaming();
+
+	rw::V3d cameraPos = worldCam.GetRWFrame()->getLTM()->pos;
+
+	std::vector<Entity*> renderList;
+	renderList.reserve(5000);
+
+	LIST_FOREACH_BEGIN(Entity, this->entityList.root, worldNode)
+
+		item->ResetChildrenDrawn();
+
+	LIST_FOREACH_END
 
     // Visit the things that are visible.
     this->staticEntityGrid.VisitSectorsByFrustum( frustum,
@@ -171,6 +240,13 @@ void World::RenderWorld( void *gfxDevice )
         for ( Entity *entity : sector.entitiesOnSector )
         {
             rw::Sphere worldSphere;
+
+			rw::V3d entityPos = entity->GetMatrix().pos;
+
+			if (rw::length(rw::sub(entityPos, cameraPos)) > entity->GetModelInfo()->GetLODDistance())
+			{
+				continue;
+			}
 
             bool hasEntityBounds = entity->GetWorldBoundingSphere( worldSphere );
 
@@ -203,18 +279,33 @@ void World::RenderWorld( void *gfxDevice )
                     // If the entity has a valid rw object, we can render it.
                     if ( rw::Object *rwobj = entity->GetRWObject() )
                     {
-                        if ( rwobj->type == rw::Atomic::ID )
-                        {
-                            // We only render atomics for now.
-                            rw::Atomic *atomic = (rw::Atomic*)rwobj;
+						if (entity->GetLODEntity())
+						{
+							entity->GetLODEntity()->IncrementChildrenDrawn();
+						}
 
-                            atomic->render();
-                        }
+						renderList.push_back(entity);
                     }
                 }
             }
         }
     });
+
+	for (auto& entity : renderList)
+	{
+		if (entity->ShouldBeDrawn())
+		{
+			rw::Object* rwobj = entity->GetRWObject();
+
+			if (rwobj->type == rw::Atomic::ID)
+			{
+				// We only render atomics for now.
+				rw::Atomic *atomic = (rw::Atomic*)rwobj;
+
+				atomic->render();
+			}
+		}
+	}
 
     // Present world scene.
     worldCam.EndUpdate();

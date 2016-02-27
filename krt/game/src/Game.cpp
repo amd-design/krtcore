@@ -119,6 +119,8 @@ void Game::Run()
 	bool wantsToExit  = false;
 	uint64_t lastTime = 0;
 
+	this->lastGameTime = 0;
+
 	// exit command
 	ConsoleCommand quitCommand("quit", [&]() {
 		wantsToExit = true;
@@ -164,6 +166,8 @@ void Game::Run()
 		// store timing values for this frame
 		this->dT            = millis / 1000.0f;
 		this->lastFrameTime = millis;
+
+		this->lastGameTime += millis;
 
 		lastTime = thisTime;
 

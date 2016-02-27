@@ -43,6 +43,8 @@ class Game
 
 	inline uint32_t GetLastFrameTime() { return lastFrameTime; }
 
+	inline uint64_t GetGameTime() { return lastGameTime; }
+
 	std::string GetDevicePathPrefix(void) { return "gta3:/"; }
 
 	GameUniversePtr AddUniverse(const GameConfiguration& configuration);
@@ -64,6 +66,7 @@ class Game
   private:
 	float dT;
 	uint32_t lastFrameTime;
+	uint64_t lastGameTime;
 
 	std::string gameDir;
 

@@ -375,7 +375,7 @@ void ModelManager::LoadResource( streaming::ident_t localID, const void *dataBuf
 
             if ( modelPtr == NULL )
             {
-                throw std::exception( "invalid model file" );
+                //throw std::exception( "invalid model file" );
             }
         }
         catch( ... )
@@ -402,11 +402,12 @@ void ModelManager::UnloadResource( streaming::ident_t localID )
 
     // Delete GPU data.
     {
-        assert( modelEntry->modelPtr != NULL );
+		if (modelEntry->modelPtr != NULL)
+		{
+			rw::Object *rwobj = modelEntry->modelPtr;
 
-        rw::Object *rwobj = modelEntry->modelPtr;
-
-        ModelResource::NativeReleaseModel( rwobj );
+			ModelResource::NativeReleaseModel(rwobj);
+		}
     }
 
     modelEntry->modelPtr = NULL;

@@ -2,7 +2,7 @@
 
 #include "Camera.h"
 
-#include "sys/Timer.h"
+#include "Game.h"
 
 namespace krt
 {
@@ -68,7 +68,7 @@ private:
 
         inline void GiveVelocity( float speed )
         {
-            timer_t cur_milli = sys::Milliseconds();
+            timer_t cur_milli = theGame->GetGameTime();
 
             this->velocity_at_start_request = this->GetAtTime( cur_milli );
             this->start_velocity = cur_milli;
@@ -84,7 +84,7 @@ private:
             if ( this->isMoving )
             {
                 // Update current status.
-                timer_t cur_milli = sys::Milliseconds();
+                timer_t cur_milli = theGame->GetGameTime();
 
                 this->velocity_at_start_request = this->GetAtTime( cur_milli );
                 this->start_velocity = cur_milli;
@@ -105,7 +105,7 @@ private:
 
         inline numberType GetCurrent( void )
         {
-            timer_t cur_milli = sys::Milliseconds();
+            timer_t cur_milli = theGame->GetGameTime();
 
             numberType currentVelo = this->GetAtTime( cur_milli );
 

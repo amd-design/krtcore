@@ -115,6 +115,8 @@ void ConsoleVariableManager::AddEntryFlags(const std::string& name, int flags)
 	if (it != m_entries.end())
 	{
 		it->second.flags |= flags;
+
+		m_parentContext->SetVariableModifiedFlags(it->second.flags);
 	}
 }
 

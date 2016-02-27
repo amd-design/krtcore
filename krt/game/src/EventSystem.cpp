@@ -5,6 +5,8 @@
 
 #include <Console.h>
 
+#include <KeyBinding.h>
+
 namespace krt
 {
 class NullEvent : public Event
@@ -36,7 +38,7 @@ public:
 
 void KeyEvent::Handle()
 {
-
+	g_bindings->HandleKeyEvent(this);
 }
 
 void CharEvent::Handle()

@@ -7,7 +7,7 @@ namespace krt
 class Event abstract
 {
   public:
-	inline uint64_t GetTime() { return m_time; }
+	inline uint64_t GetTime() const { return m_time; }
 
 	inline void SetTime(uint64_t time) { m_time = time; }
 
@@ -220,6 +220,16 @@ class KeyEvent : public Event
 	}
 
 	virtual void Handle() override;
+
+	inline bool IsDownEvent() const
+	{
+		return m_isDown;
+	}
+
+	inline KeyCode GetKeyCode() const
+	{
+		return m_keyCode;
+	}
 
   private:
 	bool m_isDown;
