@@ -157,7 +157,7 @@ void EditorCameraControls::OnFrame( Camera *camera )
             matrix_get_yaw_pitch( camView, cur_yaw, cur_pitch );
 
             // Make sure we do not go overboard, so limit pitch.
-            float new_pitch = std::max( -90.0f, std::min( 90.0f, (float)( cur_pitch + pitch_velo_val ) ) );
+            float new_pitch = std::max( -89.0f, std::min( 89.0f, (float)( cur_pitch + pitch_velo_val ) ) );
 
             matrix_from_yaw_pitch( camView, cur_yaw + yaw_velo_val, new_pitch );
         }
