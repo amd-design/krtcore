@@ -6,6 +6,8 @@
 
 #include "NativePerfLocks.h"
 
+#include "src/rwgta.h"
+
 namespace krt
 {
 
@@ -289,17 +291,40 @@ void ModelManager::ModelResource::ReleaseModel( rw::Object *rwobj )
 static rw::Atomic* GetFirstClumpAtomic( rw::Clump *clump )
 {
     rw::Atomic *firstAtom = NULL;
+	rw::Atomic *firstNodeNameAtom = NULL; // first atomic found by _Ln search
 
     rw::clumpForAllAtomics( clump,
         [&]( rw::Atomic *atom )
     {
+		const char* nodeName = gta::getNodeName(atom->getFrame());
+		int nodeNameLength = strlen(nodeName);
+
+		if (nodeNameLength > 3)
+		{
+			// find last _ (for node_L0)
+			const char* underscore = strrchr(nodeName, '_');
+
+			if (underscore && strlen(underscore) > 2)
+			{
+				if (toupper(underscore[1]) == 'L')
+				{
+					int level = atoi(&underscore[2]);
+
+					if (level == 0)
+					{
+						firstNodeNameAtom = atom;
+					}
+				}
+			}
+		}
+
         if ( !firstAtom )
         {
             firstAtom = atom;
         }
     });
 
-    return firstAtom;
+    return (firstNodeNameAtom) ? firstNodeNameAtom : firstAtom;
 }
 
 void ModelManager::LoadResource( streaming::ident_t localID, const void *dataBuf, size_t memSize )
