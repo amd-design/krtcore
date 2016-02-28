@@ -177,6 +177,12 @@ class Win32GameWindow : public GameWindow
 		}
 	}
 
+	virtual void GetMetrics(int& width, int& height) override
+	{
+		width = m_width;
+		height = m_height;
+	}
+
   private:
 	void ProcessMouse()
 	{

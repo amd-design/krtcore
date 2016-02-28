@@ -19,6 +19,8 @@
 
 #include <src/rwgta.h>
 
+#include "fonts/FontRenderer.h"
+
 #include <Windows.h>
 
 #pragma warning(disable : 4996)
@@ -110,6 +112,8 @@ void Game::Run()
 
 	std::unique_ptr<GameWindow> gameWindow = GameWindow::Create("ATG: TheGame", 1280, 720, &eventSystem);
 	void* gfxContext                       = gameWindow->CreateGraphicsContext();
+
+	TheFonts->Initialize(CreateGameInterface(gameWindow.get()));
 
 	eventSystem.RegisterEventSourceFunction([&]() {
 		gameWindow->ProcessEvents();

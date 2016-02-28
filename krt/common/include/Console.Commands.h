@@ -52,6 +52,8 @@ class ConsoleCommandManager
 
 	void Invoke(const std::string& commandString);
 
+	void ForAllCommands(const std::function<void(const std::string&)>& callback);
+
   private:
 	struct Entry
 	{

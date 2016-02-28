@@ -106,6 +106,20 @@ void ConsoleCommandManager::Invoke(const std::string& commandName, const Program
 	}
 }
 
+void ConsoleCommandManager::ForAllCommands(const std::function<void(const std::string&)>& callback)
+{
+	{
+		// lock the mutex
+		auto lock = shared_lock_acquire<std::shared_timed_mutex>(m_mutex);
+
+		// loop through the commands
+		for (auto& command : m_entries)
+		{
+			callback(command.first);
+		}
+	}
+}
+
 ConsoleCommandManager* ConsoleCommandManager::GetDefaultInstance()
 {
 	return console::GetDefaultContext()->GetCommandManager();

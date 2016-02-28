@@ -3,6 +3,8 @@
 
 #include "Game.h"
 
+#include "src/rwd3d.h"
+
 // Camera is responsible for setting up the rendering context.
 #include <windows.h>
 #include <d3d9.h>
@@ -109,14 +111,14 @@ void Camera::BeginUpdate( void *gpuContext )
 	device->BeginScene();
 
     // Prepare things with some basic render states.
-	device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-	device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
-	device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
-	device->SetRenderState(D3DRS_ALPHABLENDENABLE, 0);
-	device->SetRenderState(D3DRS_ALPHATESTENABLE, 1);
-	device->SetRenderState(D3DRS_ALPHAREF, 128);
-	device->SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATEREQUAL);
-	device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+	rw::d3d::setRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+	rw::d3d::setRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+	rw::d3d::setRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+	rw::d3d::setRenderState(D3DRS_ALPHABLENDENABLE, 0);
+	rw::d3d::setRenderState(D3DRS_ALPHATESTENABLE, 1);
+	rw::d3d::setRenderState(D3DRS_ALPHAREF, 128);
+	rw::d3d::setRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATEREQUAL);
+	rw::d3d::setTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
 
     // Set projection stuff.
     {

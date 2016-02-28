@@ -248,6 +248,8 @@ class CharEvent : public Event
 
 	virtual void Handle() override;
 
+	inline const std::string& GetCharacter() const { return m_character; }
+
   private:
 	std::string m_character;
 };

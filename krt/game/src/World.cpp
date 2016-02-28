@@ -12,8 +12,12 @@
 
 #include "KeyBinding.h"
 
+#include "fonts/FontRenderer.h"
+
 namespace krt
 {
+
+void RenderGfxConsole();
 
 World::World( void )
 {
@@ -355,6 +359,11 @@ void World::RenderWorld( void *gfxDevice )
 			}
 		}
 	}
+
+	// Render 2D things.
+	RenderGfxConsole();
+
+	TheFonts->DrawPerFrame();
 
     // Present world scene.
     worldCam.EndUpdate();
