@@ -36,6 +36,24 @@ struct ModelManager : public streaming::StreamingTypeInterface
 		rw::Object* CloneModel(void);
 		void ReleaseModel(rw::Object* rwobj);
 
+		inline float GetMinimumDistance(void) const
+		{
+			// if not a LOD, no minimum distance
+			if (this->lodDistance < 300.0f)
+			{
+				return 0.0f;
+			}
+
+			// if we have a non-LOD model, don't draw once we draw that
+			if (this->non_lod_model)
+			{
+				return this->non_lod_model->GetLODDistance();
+			}
+
+			// use the game-specific minimum distance
+			return this->minimumDistance;
+		}
+
 	  private:
 		friend struct ModelManager;
 
@@ -56,8 +74,10 @@ struct ModelManager : public streaming::StreamingTypeInterface
 		streaming::ident_t id;
 		streaming::ident_t texDictID;
 		float lodDistance;
+		float minimumDistance;
 		int flags;
 
+		ModelResource* non_lod_model; // non-SA: model of a higher-quality model than this one
 		ModelResource* lod_model; // model of a lower quality model than this one.
 
 		eModelType modelType;

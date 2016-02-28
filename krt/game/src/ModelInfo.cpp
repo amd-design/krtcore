@@ -91,10 +91,12 @@ streaming::ident_t ModelManager::RegisterAtomicModel(
     modelEntry->id = id;
     modelEntry->texDictID = -1;
     modelEntry->lodDistance = lodDistance;
+	modelEntry->minimumDistance = 100.0f; // NOTE: only valid for III!
     modelEntry->flags = flags;
     modelEntry->modelPtr = NULL;
     modelEntry->modelType = eModelType::ATOMIC;
     modelEntry->lod_model = NULL;
+	modelEntry->non_lod_model = NULL;
 
     modelEntry->lockModelLoading = SRWLOCK_INIT;
 
@@ -139,7 +141,7 @@ streaming::ident_t ModelManager::RegisterAtomicModel(
         // We are only interresting for LOD matching if our name is longer than three characters.
         std::string lod_id = name.substr( 3 );
 
-        if ( strncmp( name.c_str(), "LOD", 3 ) == 0 )
+        if ( lodDistance > 300.0f )
         {
             isLODModel = true;
         }
@@ -159,6 +161,7 @@ streaming::ident_t ModelManager::RegisterAtomicModel(
                 ModelResource *baseModelEntry = findBaseModel->second;
 
                 baseModelEntry->lod_model = modelEntry;
+				modelEntry->non_lod_model = baseModelEntry;
             }
         }
         else
@@ -172,6 +175,7 @@ streaming::ident_t ModelManager::RegisterAtomicModel(
                 ModelResource *lodModelEntry = findLODModel->second;
 
                 modelEntry->lod_model = lodModelEntry;
+				lodModelEntry->non_lod_model = modelEntry;
             }
         }
 

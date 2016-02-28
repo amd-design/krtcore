@@ -283,8 +283,16 @@ void World::RenderWorld( void *gfxDevice )
             rw::Sphere worldSphere;
 
 			rw::V3d entityPos = entity->GetMatrix().pos;
+			float entityDistance = rw::length(rw::sub(entityPos, cameraPos));
 
-			if (rw::length(rw::sub(entityPos, cameraPos)) > entity->GetModelInfo()->GetLODDistance())
+			auto modelInfo = entity->GetModelInfo();
+
+			if (entityDistance > modelInfo->GetLODDistance())
+			{
+				continue;
+			}
+			
+			if (entityDistance < modelInfo->GetMinimumDistance())
 			{
 				continue;
 			}
