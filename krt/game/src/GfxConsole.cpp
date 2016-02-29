@@ -59,6 +59,12 @@ private:
 GfxConsole::GfxConsole()
 	: m_screenWidth(1920), m_screenHeight(1080), m_active(false), m_keyListener(std::bind(&GfxConsole::HandleKey, this, std::placeholders::_1)), m_charListener(std::bind(&GfxConsole::HandleChar, this, std::placeholders::_1)), m_screenTop(0)
 {
+	// update width/height from console variables
+	ConsoleVariableManager* varMan = console::GetDefaultContext()->GetVariableManager();
+	m_screenWidth = atoi(varMan->FindEntryRaw("r_width")->GetValue().c_str());
+	m_screenHeight = atoi(varMan->FindEntryRaw("r_height")->GetValue().c_str());
+
+	// set size
 	m_screenBuffer.resize(1);
 	m_screenSize = 1;
 
