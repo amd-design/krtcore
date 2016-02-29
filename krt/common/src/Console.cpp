@@ -15,11 +15,11 @@ namespace console
 {
 struct ConsoleManagers : public ConsoleManagersBase
 {
-	std::unique_ptr<BindingManager> bindingManager;
-
 	std::unique_ptr<ConsoleCommandManager> commandManager;
 
 	std::unique_ptr<ConsoleVariableManager> variableManager;
+
+	std::unique_ptr<BindingManager> bindingManager;
 };
 
 Context::Context()
