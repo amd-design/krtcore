@@ -57,7 +57,7 @@ private:
 };
 
 GfxConsole::GfxConsole()
-	: m_screenWidth(1920), m_screenHeight(1080), m_active(true), m_keyListener(std::bind(&GfxConsole::HandleKey, this, std::placeholders::_1)), m_charListener(std::bind(&GfxConsole::HandleChar, this, std::placeholders::_1)), m_screenTop(0)
+	: m_screenWidth(1920), m_screenHeight(1080), m_active(false), m_keyListener(std::bind(&GfxConsole::HandleKey, this, std::placeholders::_1)), m_charListener(std::bind(&GfxConsole::HandleChar, this, std::placeholders::_1)), m_screenTop(0)
 {
 	m_screenBuffer.resize(1);
 	m_screenSize = 1;
@@ -79,7 +79,14 @@ void GfxConsole::HandleKey(const KeyEvent* ev)
 	{
 		m_active = !m_active;
 
-		// TODO: mark a key catcher
+		if (m_active)
+		{
+			m_keyListener.Catch();
+		}
+		else
+		{
+			m_keyListener.Release();
+		}
 	}
 
 	// return if not active

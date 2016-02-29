@@ -38,8 +38,6 @@ public:
 
 void KeyEvent::Handle()
 {
-	g_bindings->HandleKeyEvent(this);
-
 	EventListener<KeyEvent>::Handle(this);
 }
 

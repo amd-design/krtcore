@@ -283,9 +283,9 @@ static std::map<std::string, KeyCode, IgnoreCaseLess> keyNameMap =
 	{ "Sleep", KeyCode::Sleep }
 };
 
-BindingManager::BindingManager()
+BindingManager::BindingManager(console::Context* context)
 {
-	m_bindCommand = std::make_unique<ConsoleCommand>("bind", [=] (const std::string& keyName, const std::string& commandString)
+	m_bindCommand = std::make_unique<ConsoleCommand>(context, "bind", [=] (const std::string& keyName, const std::string& commandString)
 	{
 		auto it = keyNameMap.find(keyName);
 
@@ -300,7 +300,7 @@ BindingManager::BindingManager()
 		console::SetVariableModifiedFlags(ConVar_Archive);
 	});
 
-	m_unbindCommand = std::make_unique<ConsoleCommand>("unbind", [=] (const std::string& keyName)
+	m_unbindCommand = std::make_unique<ConsoleCommand>(context, "unbind", [=] (const std::string& keyName)
 	{
 		auto it = keyNameMap.find(keyName);
 
@@ -315,10 +315,12 @@ BindingManager::BindingManager()
 		console::SetVariableModifiedFlags(ConVar_Archive);
 	});
 
-	m_unbindAllCommand = std::make_unique<ConsoleCommand>("unbindall", [=] ()
+	m_unbindAllCommand = std::make_unique<ConsoleCommand>(context, "unbindall", [=] ()
 	{
 		m_bindings.clear();
 	});
+
+	m_keyListener = std::make_unique<EventListener<KeyEvent>>(std::bind(&BindingManager::HandleKeyEvent, this, std::placeholders::_1));
 }
 
 void BindingManager::HandleKeyEvent(const KeyEvent* ev)
@@ -412,7 +414,4 @@ void BindingManager::WriteBindings(const TWriteLineCB& writeLineFunction)
 		writeLineFunction("bind \"" + reverseKeyMap[binding.first] + "\" \"" + binding.second + "\"");
 	}
 }
-
-static BindingManager g_bindingMgr;
-BindingManager* g_bindings = &g_bindingMgr;
 }

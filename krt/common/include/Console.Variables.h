@@ -166,7 +166,7 @@ enum ConsoleVariableFlags
 	ConVar_Modified = 2
 };
 
-class ConsoleVariableManager : public ConsoleVariableManagerProxy
+class ConsoleVariableManager
 {
 public:
 	using THandlerPtr = std::shared_ptr<internal::ConsoleVariableEntryBase>;

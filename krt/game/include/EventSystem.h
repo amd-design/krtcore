@@ -282,17 +282,43 @@ class MouseEvent : public Event
 template <typename T>
 struct EventListener
 {
+	struct State
+	{
+		std::set<EventListener*> listeners;
+		EventListener* catcher;
+
+		State()
+			: catcher(nullptr)
+		{
+
+		}
+	};
+
 	template <typename TCallback>
 	EventListener(const TCallback& callback)
 	{
 		m_handler = callback;
 
-		ms_listeners.insert(this);
+		GetState()->listeners.insert(this);
 	}
 
 	~EventListener()
 	{
-		ms_listeners.erase(this);
+		GetState()->listeners.erase(this);
+	}
+
+	void Catch()
+	{
+		assert(GetState()->catcher == nullptr);
+
+		GetState()->catcher = this;
+	}
+
+	void Release()
+	{
+		assert(GetState()->catcher == this);
+
+		GetState()->catcher = nullptr;
 	}
 
   private:
@@ -300,22 +326,32 @@ struct EventListener
 
 	// static members
   public:
-	using TSet = std::set<EventListener*>;
-
 	static void Handle(const T* event)
 	{
-		for (auto& listener : ms_listeners)
+		for (auto& listener : GetState()->listeners)
 		{
+			// ignore if no catcher is set
+			if (GetState()->catcher && GetState()->catcher != listener)
+			{
+				continue;
+			}
+
 			listener->m_handler(event);
 		}
 	}
 
   private:
-	static TSet ms_listeners;
+	// this is not a dynamic initializer due to initializer order
+	static State* GetState()
+	{
+		static State state;
+
+		return &state;
+	}
 };
 
 #define DECLARE_EVENT_LISTENER(t) \
-	EventListener<t>::TSet EventListener<t>::ms_listeners;
+	
 
 class EventSystem
 {

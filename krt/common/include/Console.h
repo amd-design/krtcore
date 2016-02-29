@@ -5,13 +5,14 @@
 
 namespace krt
 {
-class ConsoleVariableManagerProxy
+class ConsoleManagersBase
 {
 public:
-	virtual ~ConsoleVariableManagerProxy() = default;
+	virtual ~ConsoleManagersBase() = default;
 };
 
 class ConsoleVariableManager;
+class BindingManager;
 
 namespace console
 {
@@ -34,15 +35,11 @@ public:
 
 	void SetVariableModifiedFlags(int flags);
 
-	inline ConsoleCommandManager* GetCommandManager()
-	{
-		return m_commandManager.get();
-	}
+	ConsoleCommandManager* GetCommandManager();
 
-	inline ConsoleVariableManager* GetVariableManager()
-	{
-		return (ConsoleVariableManager*)m_variableManager.get();
-	}
+	ConsoleVariableManager* GetVariableManager();
+
+	BindingManager* GetBindingManager();
 
 	inline Context* GetFallbackContext()
 	{
@@ -54,9 +51,7 @@ private:
 
 	int m_variableModifiedFlags;
 
-	std::unique_ptr<ConsoleCommandManager> m_commandManager;
-
-	std::unique_ptr<ConsoleVariableManagerProxy> m_variableManager;
+	std::unique_ptr<ConsoleManagersBase> m_managers;
 
 	std::string m_commandBuffer;
 

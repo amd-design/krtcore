@@ -44,7 +44,7 @@ public:
 	using TWriteLineCB = std::function<void(const std::string& line)>;
 
 public:
-	BindingManager();
+	BindingManager(console::Context* context);
 
 	void WriteBindings(const TWriteLineCB& writeLineFunction);
 
@@ -55,6 +55,8 @@ private:
 	std::unique_ptr<ConsoleCommand> m_unbindCommand;
 
 	std::unique_ptr<ConsoleCommand> m_unbindAllCommand;
+
+	std::unique_ptr<EventListener<KeyEvent>> m_keyListener;
 
 	std::map<KeyCode, std::string> m_bindings;
 };
