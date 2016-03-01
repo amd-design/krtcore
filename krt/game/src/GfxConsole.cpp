@@ -48,7 +48,7 @@ class GfxConsole
 	EventListener<KeyEvent> m_keyListener;
 	EventListener<CharEvent> m_charListener;
 
-	int m_screenTop;
+	intptr_t m_screenTop;
 	int m_screenSize;
 
 	std::string m_suggestionSource;
@@ -132,7 +132,7 @@ void GfxConsole::HandleKey(const KeyEvent* ev)
 
 			if (m_currentSuggestion < 0)
 			{
-				m_currentSuggestion = m_suggestions.size() - 1;
+				m_currentSuggestion = static_cast<int>(m_suggestions.size()) - 1;
 			}
 
 			m_inputBuffer = m_suggestions[m_currentSuggestion] + " ";
@@ -171,7 +171,7 @@ void GfxConsole::HandleKey(const KeyEvent* ev)
 
 		m_screenTop += 1;
 
-		if (m_screenTop > m_screenBuffer.size())
+		if (m_screenTop > static_cast<intptr_t>(m_screenBuffer.size()))
 		{
 			m_screenTop = m_screenBuffer.size() - 1;
 		}
@@ -219,12 +219,12 @@ void GfxConsole::UpdateSuggestions()
 		std::set<std::string, IgnoreCaseLess> suggestions;
 
 		console::GetDefaultContext()->GetCommandManager()->ForAllCommands([&](const std::string& name) {
-			if (strnicmp(name.c_str(), m_typedInputBuffer.c_str(), m_typedInputBuffer.length()) != 0)
+			if (_strnicmp(name.c_str(), m_typedInputBuffer.c_str(), m_typedInputBuffer.length()) != 0)
 			{
 				return;
 			}
 
-			if (stricmp(name.c_str(), m_typedInputBuffer.c_str()) == 0)
+			if (_stricmp(name.c_str(), m_typedInputBuffer.c_str()) == 0)
 			{
 				return;
 			}
@@ -261,7 +261,7 @@ void GfxConsole::Print(const std::string& string)
 	std::stringstream stream;
 	std::string* stringReference = &m_screenBuffer.back();
 
-	for (int i = 0; i < string.length(); i++)
+	for (size_t i : irange(string.length()))
 	{
 		if (string[i] == '\n')
 		{
@@ -302,8 +302,8 @@ void GfxConsole::Render()
 		return;
 	}
 
-	int inputBoxRight;
-	int inputBoxBottom;
+	float inputBoxRight;
+	float inputBoxBottom;
 
 	// input box
 	{
@@ -312,11 +312,11 @@ void GfxConsole::Render()
 		std::string text = "KRT>^7 " + m_inputBuffer;
 		TheFonts->GetStringMetrics(text, 14.0f, 1.0f, "Consolas", &mRect);
 
-		int x = 15;
-		int y = 15;
+		float x = 15.0f;
+		float y = 15.0f;
 
-		int w = m_screenWidth - 30;
-		int h = 16 + 3 + 3;
+		float w = m_screenWidth - 30.0f;
+		float h = 16.0f + 3 + 3;
 
 		Rect rect;
 		rect.SetRect(x, y, x + w, y + h);
@@ -339,11 +339,11 @@ void GfxConsole::Render()
 	{
 		std::lock_guard<std::mutex> lock(m_screenMutex);
 
-		int x = 15;
-		int y = inputBoxBottom + 5;
+		float x = 15.0f;
+		float y = inputBoxBottom + 5.0f;
 
-		int w = m_screenWidth - 30;
-		int h = m_screenHeight - y - 15 - 2;
+		float w = m_screenWidth - 30.0f;
+		float h = m_screenHeight - y - 15 - 2;
 
 		Rect rect;
 		rect.SetRect(x, y, x + w, y + h);
@@ -358,7 +358,7 @@ void GfxConsole::Render()
 
 		// TODO: reset flag?
 
-		m_screenSize = (h - 4) / size;
+		m_screenSize = static_cast<int>((h - 4) / size);
 		int i        = 0;
 
 		y += 5;
@@ -413,12 +413,12 @@ void GfxConsole::Render()
 			TheFonts->GetStringMetrics(*longestSuggestion, 14.0f, 1.0f, "Consolas", &mRect);
 
 			// set up coordinates
-			int x = inputBoxRight;
-			int y = inputBoxBottom - 2;
+			float x = inputBoxRight;
+			float y = inputBoxBottom - 2;
 
-			int lines = std::min(m_suggestions.size(), (size_t)20);
-			int h     = (lines * 16) + 4 + 6;
-			int w     = mRect.Width() + 4 + 6;
+			size_t lines = std::min(m_suggestions.size(), (size_t)20);
+			float h      = (lines * 16.0f) + 4 + 6;
+			float w      = mRect.Width() + 4 + 6;
 
 			// draw background
 			Rect rect;
