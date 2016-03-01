@@ -291,10 +291,20 @@ struct EventListener
 		    : catcher(nullptr)
 		{
 		}
+
+		~State()
+		{
+			for (auto& listener : listeners)
+			{
+				// so we won't try destructing
+				listener->m_hasListener = false;
+			}
+		}
 	};
 
 	template <typename TCallback>
 	EventListener(const TCallback& callback)
+		: m_hasListener(true)
 	{
 		m_handler = callback;
 
@@ -303,7 +313,10 @@ struct EventListener
 
 	~EventListener()
 	{
-		GetState()->listeners.erase(this);
+		if (m_hasListener)
+		{
+			GetState()->listeners.erase(this);
+		}
 	}
 
 	void Catch()
@@ -322,6 +335,8 @@ struct EventListener
 
 private:
 	std::function<void(const T*)> m_handler;
+
+	bool m_hasListener;
 
 	// static members
 public:
