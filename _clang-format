@@ -3,7 +3,7 @@ IndentWidth: 4
 
 Language: Cpp
 PointerAlignment: Left
-AlignAfterOpenBracket: Align
+AlignAfterOpenBracket: DontAlign
 AlignConsecutiveAssignments: true
 AlwaysBreakTemplateDeclarations: true
 BreakBeforeBraces: Allman
@@ -16,6 +16,10 @@ SpacesInSquareBrackets: false
 Standard: Cpp11
 TabWidth: 4
 UseTab: ForIndentation
+ForEachMacros:
+    - LIST_FOREACH_BEGIN
+ContinuationIndentWidth: 4
+AccessModifierOffset: -4
 
 IncludeCategories:
     - Regex: '^(<|")StdInc'
