@@ -9,6 +9,7 @@
 #include "ModelInfo.h"
 #include "Streaming.h"
 #include "TexDict.h"
+#include "CollisionStore.h"
 #include "World.h"
 
 #include "Console.Commands.h"
@@ -36,6 +37,7 @@ public:
 	inline streaming::StreamMan& GetStreaming(void) { return this->streaming; }
 	inline TextureManager& GetTextureManager(void) { return this->texManager; }
 	inline ModelManager& GetModelManager(void) { return this->modelManager; }
+	inline CollisionStore& GetCollisionStore(void) { return this->colStore; }
 
 	inline World* GetWorld(void) { return &theWorld; }
 
@@ -74,6 +76,7 @@ private:
 
 	TextureManager texManager;
 	ModelManager modelManager;
+	CollisionStore colStore;
 
 	World theWorld;
 

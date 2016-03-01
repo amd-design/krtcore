@@ -306,6 +306,24 @@ static bool RpClumpCalculateBoundingSphere(rw::Clump* clump, rw::Sphere& sphereO
 
 bool Entity::GetWorldBoundingSphere(rw::Sphere& sphereOut) const
 {
+	// prefer a collision model
+	auto colModel = GetModelInfo()->GetCollisionModel();
+
+	if (colModel)
+	{
+		sphereOut.center = rw::add(colModel->boundingSphere.center, this->GetMatrix().pos);
+		sphereOut.radius = colModel->boundingSphere.radius;
+
+		// if the radius is empty, don't do anything
+		if (sphereOut.radius == 0.0f)
+		{
+			return false;
+		}
+
+		return true;
+	}
+
+	// try RW objects
 	rw::Object* rwObj = this->rwObject;
 
 	if (rwObj == NULL)

@@ -30,7 +30,7 @@ namespace krt
 
 Game* theGame = NULL;
 
-Game::Game(const std::vector<std::pair<std::string, std::string>>& setList) : streaming(GAME_NUM_STREAMING_CHANNELS), texManager(streaming), modelManager(streaming, texManager)
+Game::Game(const std::vector<std::pair<std::string, std::string>>& setList) : streaming(GAME_NUM_STREAMING_CHANNELS), texManager(streaming), modelManager(streaming, texManager), colStore(streaming)
 {
 	assert(theGame == NULL);
 

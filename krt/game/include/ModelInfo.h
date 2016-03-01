@@ -8,6 +8,13 @@
 
 #include <Console.CommandHelpers.h>
 
+// custom include guard
+#ifndef COLLISION_H
+#define COLLISION_H
+
+#include "src/collision.h"
+#endif
+
 #define MODEL_ID_BASE 0
 #define MAX_MODELS 20000
 
@@ -32,6 +39,21 @@ struct ModelManager : public streaming::StreamingTypeInterface
 		inline int GetFlags(void) const { return this->flags; }
 
 		inline ModelResource* GetLODModel(void) { return this->lod_model; }
+
+		inline std::shared_ptr<CColModel> GetCollisionModel()
+		{
+			if (this->col_model.expired())
+			{
+				return nullptr;
+			}
+
+			return this->col_model.lock();
+		}
+
+		inline void SetCollisionModel(const std::shared_ptr<CColModel>& pointer)
+		{
+			this->col_model = pointer;
+		}
 
 		rw::Object* CloneModel(void);
 		void ReleaseModel(rw::Object* rwobj);
@@ -79,6 +101,8 @@ struct ModelManager : public streaming::StreamingTypeInterface
 
 		ModelResource* non_lod_model; // non-SA: model of a higher-quality model than this one
 		ModelResource* lod_model;     // model of a lower quality model than this one.
+
+		std::weak_ptr<CColModel> col_model;
 
 		eModelType modelType;
 

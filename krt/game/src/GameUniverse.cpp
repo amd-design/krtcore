@@ -87,6 +87,12 @@ void GameUniverse::LoadConfiguration(const std::string& relativePath)
 		    localConsole.ExecuteSingleCommand(ProgramArguments{"add_cdimage", m_configuration.gameName, path});
 		});
 
+	ConsoleCommand colFileCmg(&localConsole, "COLFILE",
+							  [&] (int levelNum, const std::string& fileName)
+	{
+		localConsole.ExecuteSingleCommand(ProgramArguments{"load_coll", GetMountPoint() + fileName});
+	});
+
 	// run the configuration file
 	localConsole.AddToBuffer(std::string(reinterpret_cast<char*>(string.data()), string.size()));
 	localConsole.ExecuteBuffer();
