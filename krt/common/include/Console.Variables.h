@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Console.Commands.h>
 #include <Console.CommandHelpers.h>
+#include <Console.Commands.h>
 
 namespace krt
 {
@@ -15,7 +15,7 @@ public:
 	virtual bool SetValue(const std::string& value) = 0;
 };
 
-template<typename T, typename TConstraint = void>
+template <typename T, typename TConstraint = void>
 struct Constraints
 {
 	inline static bool Compare(const T& value, const T& minValue, const T& maxValue)
@@ -24,7 +24,7 @@ struct Constraints
 	}
 };
 
-template<typename T>
+template <typename T>
 struct Constraints<T, std::enable_if_t<std::is_arithmetic<T>::value>>
 {
 	inline static bool Compare(const T& value, const T& minValue, const T& maxValue)
@@ -47,20 +47,18 @@ struct Constraints<T, std::enable_if_t<std::is_arithmetic<T>::value>>
 
 void MarkConsoleVarModified(ConsoleVariableManager* manager, const std::string& name);
 
-template<typename T>
+template <typename T>
 class ConsoleVariableEntry : public ConsoleVariableEntryBase
 {
 public:
 	ConsoleVariableEntry(ConsoleVariableManager* manager, const std::string& name, const T& defaultValue)
-		: m_manager(manager), m_name(name), m_trackingVar(nullptr), m_defaultValue(defaultValue), m_curValue(defaultValue), m_hasConstraints(false)
+	    : m_manager(manager), m_name(name), m_trackingVar(nullptr), m_defaultValue(defaultValue), m_curValue(defaultValue), m_hasConstraints(false)
 	{
-		m_getCommand = std::make_unique<ConsoleCommand>(manager->GetParentContext(), name, [=] ()
-		{
+		m_getCommand = std::make_unique<ConsoleCommand>(manager->GetParentContext(), name, [=]() {
 			console::Printf(" \"%s\" is \"%s\"\n default: \"%s\"\n type: %s\n", name.c_str(), GetValue().c_str(), UnparseArgument(m_defaultValue).c_str(), ConsoleArgumentName<T>::Get());
 		});
 
-		m_setCommand = std::make_unique<ConsoleCommand>(manager->GetParentContext(), name, [=] (const T& newValue)
-		{
+		m_setCommand = std::make_unique<ConsoleCommand>(manager->GetParentContext(), name, [=](const T& newValue) {
 			SetRawValue(newValue);
 		});
 	}
@@ -161,8 +159,8 @@ private:
 
 enum ConsoleVariableFlags
 {
-	ConVar_None = 0,
-	ConVar_Archive = 0x1,
+	ConVar_None     = 0,
+	ConVar_Archive  = 0x1,
 	ConVar_Modified = 2
 };
 
@@ -187,7 +185,7 @@ public:
 	bool Process(const std::string& commandName, const ProgramArguments& arguments);
 
 	THandlerPtr FindEntryRaw(const std::string& name);
-	
+
 	void AddEntryFlags(const std::string& name, int flags);
 
 	void RemoveEntryFlags(const std::string& name, int flags);
@@ -205,7 +203,7 @@ private:
 	struct Entry
 	{
 		std::string name;
-		
+
 		int flags;
 
 		THandlerPtr variable;
@@ -213,7 +211,7 @@ private:
 		int token;
 
 		inline Entry(const std::string& name, int flags, const THandlerPtr& variable, int token)
-			: name(name), flags(flags), variable(variable), token(token)
+		    : name(name), flags(flags), variable(variable), token(token)
 		{
 		}
 	};
@@ -237,7 +235,7 @@ public:
 	static ConsoleVariableManager* GetDefaultInstance();
 };
 
-template<typename TValue>
+template <typename TValue>
 static std::shared_ptr<internal::ConsoleVariableEntry<TValue>> CreateVariableEntry(ConsoleVariableManager* manager, const std::string& name, const TValue& defaultValue)
 {
 	ConsoleVariableManager::THandlerPtr oldEntry = manager->FindEntryRaw(name);

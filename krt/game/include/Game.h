@@ -25,7 +25,7 @@ class Game
 {
 	friend struct Entity;
 
-  public:
+public:
 	Game(const std::vector<std::pair<std::string, std::string>>& setList);
 	~Game(void);
 
@@ -53,17 +53,17 @@ class Game
 
 	Camera& GetWorldCamera(void) { return this->worldCam; }
 
-    void SetActiveCamera( Camera *theCamera )           { this->activeCam = theCamera; }
-    Camera* GetActiveCamera( void )                     { return this->activeCam; }
+	void SetActiveCamera(Camera* theCamera) { this->activeCam = theCamera; }
+	Camera* GetActiveCamera(void) { return this->activeCam; }
 
-  private:
+private:
 	void MountUserDirectory();
 
 	void YieldThreadForShortTime();
 
 	void LoadUniverseIfAvailable();
 
-  private:
+private:
 	float dT;
 	uint32_t lastFrameTime;
 	uint64_t lastGameTime;
@@ -87,9 +87,9 @@ class Game
 
 	Camera worldCam; // camera to render the main world in
 
-    Camera *activeCam;
+	Camera* activeCam;
 
-  private:
+private:
 	std::unique_ptr<ConVar<int>> maxFPSVariable;
 
 	std::unique_ptr<ConVar<float>> timescaleVariable;

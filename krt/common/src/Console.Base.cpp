@@ -9,7 +9,7 @@ namespace krt
 {
 namespace console
 {
-static std::vector<void(*)(const char*)> g_printListeners;
+static std::vector<void (*)(const char*)> g_printListeners;
 static int g_useDeveloper;
 
 void Printf(const char* format, ...)
@@ -18,7 +18,7 @@ void Printf(const char* format, ...)
 	static thread_local std::vector<char> buffer(32768);
 
 	va_list ap;
-	
+
 	va_start(ap, format);
 	vsnprintf(&buffer[0], buffer.size(), format, ap);
 	va_end(ap);
@@ -90,7 +90,7 @@ void PrintError(const char* format, ...)
 	Printf("^1Error: %s^7", buffer.data());
 }
 
-void AddPrintListener(void(*function)(const char*))
+void AddPrintListener(void (*function)(const char*))
 {
 	g_printListeners.push_back(function);
 }

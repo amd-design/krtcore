@@ -6,459 +6,457 @@
 namespace krt
 {
 
-Entity::Entity( Game *ourGame )
+Entity::Entity(Game* ourGame)
 {
-    this->ourGame = ourGame;
+	this->ourGame = ourGame;
 
-    LIST_INSERT( ourGame->activeEntities.root, this->gameNode );
+	LIST_INSERT(ourGame->activeEntities.root, this->gameNode);
 
-    this->modelID = -1;
-    
-    this->interiorId = 0;
+	this->modelID = -1;
 
-    this->matrix.setIdentity();
-    this->hasLocalMatrix = false;
+	this->interiorId = 0;
 
-    // Initialize the flags.
-    this->isUnderwater = false;
-    this->isTunnelObject = false;
-    this->isTunnelTransition = false;
-    this->isUnimportantToStreamer = false;
+	this->matrix.setIdentity();
+	this->hasLocalMatrix = false;
 
-    // Initialize LOD things.
-    this->higherQualityEntity = NULL;
-    this->lowerQualityEntity = NULL;
+	// Initialize the flags.
+	this->isUnderwater            = false;
+	this->isTunnelObject          = false;
+	this->isTunnelTransition      = false;
+	this->isUnimportantToStreamer = false;
 
-    this->rwObject = NULL;
+	// Initialize LOD things.
+	this->higherQualityEntity = NULL;
+	this->lowerQualityEntity  = NULL;
 
-    this->onWorld = NULL;   // we are not part of a world.
+	this->rwObject = NULL;
 
-    this->cachedBoundSphereRadius = 400.0f; // TODO: cache the real bounding sphere radius in some file so we dont need the model
+	this->onWorld = NULL; // we are not part of a world.
+
+	this->cachedBoundSphereRadius = 400.0f; // TODO: cache the real bounding sphere radius in some file so we dont need the model
 
 	this->lodChildrenCount = 0;
 	this->lodChildrenDrawn = 0;
 }
 
-Entity::~Entity( void )
+Entity::~Entity(void)
 {
-    // Make sure we released our RW object.
-    this->DeleteRWObject();
+	// Make sure we released our RW object.
+	this->DeleteRWObject();
 
-    // Make sure we are not references anywhere anymore.
-    {
-        this->RemoveEntityFromWorldSectors();
-    }
+	// Make sure we are not references anywhere anymore.
+	{
+		this->RemoveEntityFromWorldSectors();
+	}
 
-    // Remove us from any world.
-    this->LinkToWorld( NULL );
+	// Remove us from any world.
+	this->LinkToWorld(NULL);
 
-    // Check whether we are linked as LOD or have a LOD.
-    // Unlink those relationships.
-    {
-        if ( Entity *highLOD = this->higherQualityEntity )
-        {
-            highLOD->lowerQualityEntity = NULL;
+	// Check whether we are linked as LOD or have a LOD.
+	// Unlink those relationships.
+	{
+		if (Entity* highLOD = this->higherQualityEntity)
+		{
+			highLOD->lowerQualityEntity = NULL;
 
-            this->higherQualityEntity = NULL;
-        }
+			this->higherQualityEntity = NULL;
+		}
 
-        if ( Entity *lowLOD = this->lowerQualityEntity )
-        {
-            lowLOD->higherQualityEntity = NULL;
+		if (Entity* lowLOD = this->lowerQualityEntity)
+		{
+			lowLOD->higherQualityEntity = NULL;
 
-            this->lowerQualityEntity = NULL;
-        }
-    }
+			this->lowerQualityEntity = NULL;
+		}
+	}
 
-    // Remove us from the game.
-    LIST_REMOVE( this->gameNode );
+	// Remove us from the game.
+	LIST_REMOVE(this->gameNode);
 }
 
-void Entity::SetModelIndex( streaming::ident_t modelID )
+void Entity::SetModelIndex(streaming::ident_t modelID)
 {
-    // Make sure we have no RW object when switching models
-    // This is required because models are not entirely thread-safe if not following certain rules.
-    assert( this->rwObject == NULL );
+	// Make sure we have no RW object when switching models
+	// This is required because models are not entirely thread-safe if not following certain rules.
+	assert(this->rwObject == NULL);
 
-    this->modelID = modelID;
+	this->modelID = modelID;
 }
 
-static rw::Frame* RwObjectGetFrame( rw::Object *rwObj )
+static rw::Frame* RwObjectGetFrame(rw::Object* rwObj)
 {
-    rw::uint8 objType = rwObj->type;
+	rw::uint8 objType = rwObj->type;
 
-    if ( objType == rw::Atomic::ID )
-    {
-        rw::Atomic *atomic = (rw::Atomic*)rwObj;
+	if (objType == rw::Atomic::ID)
+	{
+		rw::Atomic* atomic = (rw::Atomic*)rwObj;
 
-        return atomic->getFrame();
-    }
-    else if ( objType == rw::Clump::ID )
-    {
-        rw::Clump *clump = (rw::Clump*)rwObj;
+		return atomic->getFrame();
+	}
+	else if (objType == rw::Clump::ID)
+	{
+		rw::Clump* clump = (rw::Clump*)rwObj;
 
-        return clump->getFrame();
-    }
+		return clump->getFrame();
+	}
 
-    return NULL;
+	return NULL;
 }
 
-bool Entity::CreateRWObject( void )
+bool Entity::CreateRWObject(void)
 {
-    streaming::ident_t modelID = this->modelID;
+	streaming::ident_t modelID = this->modelID;
 
-    if ( modelID == -1 )
-        return false;
+	if (modelID == -1)
+		return false;
 
-    // If we already have an atomic, we refuse to update.
-    if ( this->rwObject )
-        return false;
+	// If we already have an atomic, we refuse to update.
+	if (this->rwObject)
+		return false;
 
-    // Fetch a model from the model manager.
-    Game *game = theGame;
+	// Fetch a model from the model manager.
+	Game* game = theGame;
 
-    ModelManager::ModelResource *modelEntry = game->GetModelManager().GetModelByID( modelID );
+	ModelManager::ModelResource* modelEntry = game->GetModelManager().GetModelByID(modelID);
 
-    if ( !modelEntry )
-        return false;
+	if (!modelEntry)
+		return false;
 
-    rw::Object *rwobj = modelEntry->CloneModel();
+	rw::Object* rwobj = modelEntry->CloneModel();
 
-    if ( !rwobj )
-        return false;
+	if (!rwobj)
+		return false;
 
-    // Make sure our RW object has a frame.
-    // This is because we will render it.
-    {
-        rw::uint8 objType = rwobj->type;
+	// Make sure our RW object has a frame.
+	// This is because we will render it.
+	{
+		rw::uint8 objType = rwobj->type;
 
-        if ( objType == rw::Atomic::ID )
-        {
-            rw::Atomic *atomic = (rw::Atomic*)rwobj;
+		if (objType == rw::Atomic::ID)
+		{
+			rw::Atomic* atomic = (rw::Atomic*)rwobj;
 
-            if ( atomic->getFrame() == NULL )
-            {
-                rw::Frame *parentFrame = rw::Frame::create();
+			if (atomic->getFrame() == NULL)
+			{
+				rw::Frame* parentFrame = rw::Frame::create();
 
-                atomic->setFrame( parentFrame );
-            }
-        }
-        else if ( objType == rw::Clump::ID )
-        {
-            rw::Clump *clump = (rw::Clump*)rwobj;
+				atomic->setFrame(parentFrame);
+			}
+		}
+		else if (objType == rw::Clump::ID)
+		{
+			rw::Clump* clump = (rw::Clump*)rwobj;
 
-            if ( clump->getFrame() == NULL )
-            {
-                rw::Frame *parentFrame = rw::Frame::create();
+			if (clump->getFrame() == NULL)
+			{
+				rw::Frame* parentFrame = rw::Frame::create();
 
-                clump->setFrame( parentFrame );
-            }
-        }
-    }
+				clump->setFrame(parentFrame);
+			}
+		}
+	}
 
-    this->rwObject = rwobj;
+	this->rwObject = rwobj;
 
-    // If we have a local matrix, then set it into our frame.
-    {
-        if ( this->hasLocalMatrix )
-        {
-            rw::Frame *parentFrame = RwObjectGetFrame( rwobj );
+	// If we have a local matrix, then set it into our frame.
+	{
+		if (this->hasLocalMatrix)
+		{
+			rw::Frame* parentFrame = RwObjectGetFrame(rwobj);
 
-            if ( parentFrame )
-            {
-                parentFrame->matrix = this->matrix;
-                parentFrame->updateObjects();
+			if (parentFrame)
+			{
+				parentFrame->matrix = this->matrix;
+				parentFrame->updateObjects();
 
-                this->hasLocalMatrix = false;
-            }
-        }
-    }
+				this->hasLocalMatrix = false;
+			}
+		}
+	}
 
-    return true;
+	return true;
 }
 
-void Entity::DeleteRWObject( void )
+void Entity::DeleteRWObject(void)
 {
-    rw::Object *rwobj = this->rwObject;
+	rw::Object* rwobj = this->rwObject;
 
-    if ( !rwobj )
-        return;
+	if (!rwobj)
+		return;
 
-    Game *game = theGame;
+	Game* game = theGame;
 
-    ModelManager::ModelResource *modelEntry = game->GetModelManager().GetModelByID( this->modelID );
+	ModelManager::ModelResource* modelEntry = game->GetModelManager().GetModelByID(this->modelID);
 
-    if ( !modelEntry )
-        return;
+	if (!modelEntry)
+		return;
 
-    // Store our matrix.
-    {
-        rw::Frame *parentFrame = RwObjectGetFrame( rwobj );
+	// Store our matrix.
+	{
+		rw::Frame* parentFrame = RwObjectGetFrame(rwobj);
 
-        if ( parentFrame )
-        {
-            this->matrix = parentFrame->matrix;
+		if (parentFrame)
+		{
+			this->matrix = parentFrame->matrix;
 
-            this->hasLocalMatrix = true;
-        }
-    }
+			this->hasLocalMatrix = true;
+		}
+	}
 
-    modelEntry->ReleaseModel( rwobj );
+	modelEntry->ReleaseModel(rwobj);
 
-    this->rwObject = NULL;
+	this->rwObject = NULL;
 }
 
-void Entity::SetModelling( const rw::Matrix& mat )
+void Entity::SetModelling(const rw::Matrix& mat)
 {
-    rw::Object *rwobj = this->rwObject;
+	rw::Object* rwobj = this->rwObject;
 
-    if ( rwobj == NULL )
-    {
-        this->matrix = mat;
+	if (rwobj == NULL)
+	{
+		this->matrix = mat;
 
-        this->hasLocalMatrix = true;
-    }
-    else
-    {
-        rw::Frame *parentFrame = RwObjectGetFrame( rwobj );
+		this->hasLocalMatrix = true;
+	}
+	else
+	{
+		rw::Frame* parentFrame = RwObjectGetFrame(rwobj);
 
-        assert( parentFrame != NULL );
+		assert(parentFrame != NULL);
 
-        if ( parentFrame )
-        {
-            parentFrame->matrix = mat;
-            parentFrame->updateObjects();   // that's kinda how RW works; you say that you updated the struct.
-        }
-    }
+		if (parentFrame)
+		{
+			parentFrame->matrix = mat;
+			parentFrame->updateObjects(); // that's kinda how RW works; you say that you updated the struct.
+		}
+	}
 }
 
-const rw::Matrix& Entity::GetModelling( void ) const
+const rw::Matrix& Entity::GetModelling(void) const
 {
-    rw::Object *rwobj = this->rwObject;
+	rw::Object* rwobj = this->rwObject;
 
-    if ( rwobj )
-    {
-        rw::Frame *parentFrame = RwObjectGetFrame( rwobj );
+	if (rwobj)
+	{
+		rw::Frame* parentFrame = RwObjectGetFrame(rwobj);
 
-        if ( parentFrame )
-        {
-            return parentFrame->matrix;
-        }
-    }
+		if (parentFrame)
+		{
+			return parentFrame->matrix;
+		}
+	}
 
-    return this->matrix;
+	return this->matrix;
 }
 
-const rw::Matrix& Entity::GetMatrix( void ) const
+const rw::Matrix& Entity::GetMatrix(void) const
 {
-    rw::Object *rwobj = this->rwObject;
+	rw::Object* rwobj = this->rwObject;
 
-    if ( rwobj )
-    {
-        rw::Frame *parentFrame = RwObjectGetFrame( rwobj );
+	if (rwobj)
+	{
+		rw::Frame* parentFrame = RwObjectGetFrame(rwobj);
 
-        if ( parentFrame )
-        {
-            return *parentFrame->getLTM();
-        }
-    }
+		if (parentFrame)
+		{
+			return *parentFrame->getLTM();
+		}
+	}
 
-    return this->matrix;
+	return this->matrix;
 }
 
-static bool RpClumpCalculateBoundingSphere( rw::Clump *clump, rw::Sphere& sphereOut )
+static bool RpClumpCalculateBoundingSphere(rw::Clump* clump, rw::Sphere& sphereOut)
 {
-    rw::Sphere tmpSphere;
-    bool hasSphere = false;
+	rw::Sphere tmpSphere;
+	bool hasSphere = false;
 
-    rw::clumpForAllAtomics( clump,
-        [&]( rw::Atomic *atomic )
-    {
-        rw::Sphere *atomicSphere = atomic->getWorldBoundingSphere();
+	rw::clumpForAllAtomics(clump,
+	    [&](rw::Atomic* atomic) {
+		    rw::Sphere* atomicSphere = atomic->getWorldBoundingSphere();
 
-        if ( atomicSphere )
-        {
-            if ( !hasSphere )
-            {
-                tmpSphere = *atomicSphere;
+		    if (atomicSphere)
+		    {
+			    if (!hasSphere)
+			    {
+				    tmpSphere = *atomicSphere;
 
-                hasSphere = true;
-            }
-            else
-            {
-                // Create a new sphere that encloses both spheres.
-                rw::V3d vecHalfDist = rw::scale( rw::sub( atomicSphere->center, tmpSphere.center ), 0.5f );
+				    hasSphere = true;
+			    }
+			    else
+			    {
+				    // Create a new sphere that encloses both spheres.
+				    rw::V3d vecHalfDist = rw::scale(rw::sub(atomicSphere->center, tmpSphere.center), 0.5f);
 
-                // Adjust the radius.
-                float vecHalfDistScalar = rw::length( vecHalfDist );
+				    // Adjust the radius.
+				    float vecHalfDistScalar = rw::length(vecHalfDist);
 
-                tmpSphere.center = rw::add( tmpSphere.center, vecHalfDist );
-                tmpSphere.radius = std::max( tmpSphere.radius, atomicSphere->radius ) + vecHalfDistScalar;
-            }
-        }
-    });
+				    tmpSphere.center = rw::add(tmpSphere.center, vecHalfDist);
+				    tmpSphere.radius = std::max(tmpSphere.radius, atomicSphere->radius) + vecHalfDistScalar;
+			    }
+		    }
+		});
 
-    if ( !hasSphere )
-        return false;
+	if (!hasSphere)
+		return false;
 
-    sphereOut = tmpSphere;
-    return true;
+	sphereOut = tmpSphere;
+	return true;
 }
 
-bool Entity::GetWorldBoundingSphere( rw::Sphere& sphereOut ) const
+bool Entity::GetWorldBoundingSphere(rw::Sphere& sphereOut) const
 {
-    rw::Object *rwObj = this->rwObject;
+	rw::Object* rwObj = this->rwObject;
 
-    if ( rwObj == NULL )
-    {
-        // Even if we have no model we need a bounding sphere.
-        const rw::Matrix& curMatrix = this->GetMatrix();
+	if (rwObj == NULL)
+	{
+		// Even if we have no model we need a bounding sphere.
+		const rw::Matrix& curMatrix = this->GetMatrix();
 
-        sphereOut.center = curMatrix.pos;
-        sphereOut.radius = this->cachedBoundSphereRadius;
+		sphereOut.center = curMatrix.pos;
+		sphereOut.radius = this->cachedBoundSphereRadius;
 
-        return true;
-    }
+		return true;
+	}
 
-    bool hasSphere = false;
+	bool hasSphere = false;
 
-    if ( rwObj->type == rw::Atomic::ID )
-    {
-        rw::Atomic *atomic = (rw::Atomic*)rwObj;
+	if (rwObj->type == rw::Atomic::ID)
+	{
+		rw::Atomic* atomic = (rw::Atomic*)rwObj;
 
-        rw::Sphere *atomicSphere = atomic->getWorldBoundingSphere();
+		rw::Sphere* atomicSphere = atomic->getWorldBoundingSphere();
 
-        if ( atomicSphere )
-        {
-            sphereOut = *atomicSphere;
-           
-            hasSphere = true;
-        }
-    }
-    else if ( rwObj->type == rw::Clump::ID )
-    {
-        rw::Clump *clump = (rw::Clump*)rwObj;
+		if (atomicSphere)
+		{
+			sphereOut = *atomicSphere;
 
-        hasSphere = RpClumpCalculateBoundingSphere( clump, sphereOut );
-    }
+			hasSphere = true;
+		}
+	}
+	else if (rwObj->type == rw::Clump::ID)
+	{
+		rw::Clump* clump = (rw::Clump*)rwObj;
 
-    if ( hasSphere )
-    {
-        // Store the last calculated bounding sphere radius for later.
-        this->cachedBoundSphereRadius = sphereOut.radius;
-    }
+		hasSphere = RpClumpCalculateBoundingSphere(clump, sphereOut);
+	}
 
-    return hasSphere;
+	if (hasSphere)
+	{
+		// Store the last calculated bounding sphere radius for later.
+		this->cachedBoundSphereRadius = sphereOut.radius;
+	}
+
+	return hasSphere;
 }
 
-void Entity::LinkToWorld( World *theWorld )
+void Entity::LinkToWorld(World* theWorld)
 {
-    if ( World *prevWorld = this->onWorld )
-    {
-        LIST_REMOVE( this->worldNode );
+	if (World* prevWorld = this->onWorld)
+	{
+		LIST_REMOVE(this->worldNode);
 
-        this->onWorld = NULL;
-    }
+		this->onWorld = NULL;
+	}
 
-    if ( theWorld )
-    {
-        LIST_INSERT( theWorld->entityList.root, worldNode );
+	if (theWorld)
+	{
+		LIST_INSERT(theWorld->entityList.root, worldNode);
 
-        this->onWorld = theWorld;
-    }
+		this->onWorld = theWorld;
+	}
 }
 
-World* Entity::GetWorld( void )
+World* Entity::GetWorld(void)
 {
-    return onWorld;
+	return onWorld;
 }
 
-void Entity::SetLODEntity( Entity *lodInst )
+void Entity::SetLODEntity(Entity* lodInst)
 {
-    if ( Entity *prevLOD = this->lowerQualityEntity )
-    {
-        prevLOD->higherQualityEntity = NULL;
+	if (Entity* prevLOD = this->lowerQualityEntity)
+	{
+		prevLOD->higherQualityEntity = NULL;
 
-        this->lowerQualityEntity = NULL;
-    }
+		this->lowerQualityEntity = NULL;
+	}
 
-    if ( lodInst )
-    {
-        if ( Entity *prevHighLOD = lodInst->higherQualityEntity )
-        {
-            prevHighLOD->lowerQualityEntity = NULL;
-        }
+	if (lodInst)
+	{
+		if (Entity* prevHighLOD = lodInst->higherQualityEntity)
+		{
+			prevHighLOD->lowerQualityEntity = NULL;
+		}
 
-        this->lowerQualityEntity = lodInst;
+		this->lowerQualityEntity = lodInst;
 
 		lodInst->lodChildrenCount++;
-        lodInst->higherQualityEntity = this;
-    }
+		lodInst->higherQualityEntity = this;
+	}
 }
 
-Entity* Entity::GetLODEntity( void )
+Entity* Entity::GetLODEntity(void)
 {
-    return this->lowerQualityEntity;
+	return this->lowerQualityEntity;
 }
 
-bool Entity::IsLowerLODOf( Entity *inst ) const
+bool Entity::IsLowerLODOf(Entity* inst) const
 {
-    Entity *entity = this->lowerQualityEntity;
+	Entity* entity = this->lowerQualityEntity;
 
-    while ( entity )
-    {
-        if ( entity == inst )
-            return true;
+	while (entity)
+	{
+		if (entity == inst)
+			return true;
 
-        entity = entity->lowerQualityEntity;
-    }
+		entity = entity->lowerQualityEntity;
+	}
 
-    return false;
+	return false;
 }
 
-bool Entity::IsHigherLODOf( Entity *inst ) const
+bool Entity::IsHigherLODOf(Entity* inst) const
 {
-    Entity *entity = this->higherQualityEntity;
-    
-    while ( entity )
-    {
-        if ( entity == inst )
-            return true;
+	Entity* entity = this->higherQualityEntity;
 
-        entity = entity->higherQualityEntity;
-    }
+	while (entity)
+	{
+		if (entity == inst)
+			return true;
 
-    return false;
+		entity = entity->higherQualityEntity;
+	}
+
+	return false;
 }
 
-ModelManager::ModelResource* Entity::GetModelInfo( void ) const
+ModelManager::ModelResource* Entity::GetModelInfo(void) const
 {
-    return theGame->GetModelManager().GetModelByID( this->modelID );
+	return theGame->GetModelManager().GetModelByID(this->modelID);
 }
 
-void Entity::AddEntityWorldSectorReference( EntityReference *refPtr )
+void Entity::AddEntityWorldSectorReference(EntityReference* refPtr)
 {
-    this->worldSectorReferences.push_back( refPtr );
+	this->worldSectorReferences.push_back(refPtr);
 }
 
-void Entity::RemoveEntityFromWorldSectors( void )
+void Entity::RemoveEntityFromWorldSectors(void)
 {
-    while ( this->worldSectorReferences.empty() == false )
-    {
-        EntityReference *refPtr = this->worldSectorReferences.front();
+	while (this->worldSectorReferences.empty() == false)
+	{
+		EntityReference* refPtr = this->worldSectorReferences.front();
 
-        refPtr->Unlink();
-    }
+		refPtr->Unlink();
+	}
 }
 
-void Entity::RemoveEntityWorldReference( EntityReference *refPtr )
+void Entity::RemoveEntityWorldReference(EntityReference* refPtr)
 {
-    auto find_iter = std::find( this->worldSectorReferences.begin(), this->worldSectorReferences.end(), refPtr );
+	auto find_iter = std::find(this->worldSectorReferences.begin(), this->worldSectorReferences.end(), refPtr);
 
-    if ( find_iter == this->worldSectorReferences.end() )
-        return;
+	if (find_iter == this->worldSectorReferences.end())
+		return;
 
-    this->worldSectorReferences.erase( find_iter );
+	this->worldSectorReferences.erase(find_iter);
 }
-
 }

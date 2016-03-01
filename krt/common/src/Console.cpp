@@ -1,7 +1,7 @@
 #include <StdInc.h>
-#include <Console.h>
 #include <Console.Commands.h>
 #include <Console.Variables.h>
+#include <Console.h>
 
 #include <KeyBinding.h>
 
@@ -23,18 +23,17 @@ struct ConsoleManagers : public ConsoleManagersBase
 };
 
 Context::Context()
-	: Context(GetDefaultContext())
+    : Context(GetDefaultContext())
 {
-
 }
 
 Context::Context(Context* fallbackContext)
-	: m_fallbackContext(fallbackContext)
+    : m_fallbackContext(fallbackContext)
 {
 	m_managers = std::make_unique<ConsoleManagers>();
 
 	ConsoleManagers* managers = static_cast<ConsoleManagers*>(m_managers.get());
-	managers->commandManager = std::make_unique<ConsoleCommandManager>(this);
+	managers->commandManager  = std::make_unique<ConsoleCommandManager>(this);
 	managers->variableManager = std::make_unique<ConsoleVariableManager>(this);
 
 	if (m_fallbackContext == nullptr)
@@ -104,7 +103,7 @@ void Context::ExecuteBuffer()
 		while (m_commandBuffer.length() > 0)
 		{
 			// parse the command up to the first occurrence of a newline/semicolon
-			int i = 0;
+			int i        = 0;
 			bool inQuote = false;
 
 			size_t cbufLength = m_commandBuffer.length();
@@ -161,9 +160,8 @@ static void SaveConfiguration(const std::string& path, ConsoleVariableManager* v
 
 		if (handle != INVALID_DEVICE_HANDLE)
 		{
-			auto writeLine = [&] (const std::string& line)
-			{
-				const char newLine[] = { '\r', '\n' };
+			auto writeLine = [&](const std::string& line) {
+				const char newLine[] = {'\r', '\n'};
 
 				device->Write(handle, line.c_str(), line.size());
 				device->Write(handle, newLine, sizeof(newLine));
@@ -210,8 +208,7 @@ Context* GetDefaultContext()
 	static std::unique_ptr<Context> defaultContext;
 	static std::once_flag flag;
 
-	std::call_once(flag, [] ()
-	{
+	std::call_once(flag, []() {
 		// nullptr is important - we don't have ourselves to fall back on!
 		defaultContext = std::make_unique<Context>(nullptr);
 	});
@@ -277,7 +274,7 @@ ProgramArguments Tokenize(const std::string& line)
 			// return if needed
 			if (i >= lineLength)
 			{
-				return ProgramArguments{ args };
+				return ProgramArguments{args};
 			}
 
 			// allegedly fixes issues with parsing
@@ -289,7 +286,7 @@ ProgramArguments Tokenize(const std::string& line)
 			// skip comments
 			if ((line[i] == '/' && line[i + 1] == '/') || line[i] == '#') // full line is a comment
 			{
-				return ProgramArguments{ args };
+				return ProgramArguments{args};
 			}
 
 			// /* comments
@@ -302,7 +299,7 @@ ProgramArguments Tokenize(const std::string& line)
 
 				if (i >= lineLength)
 				{
-					return ProgramArguments{ args };
+					return ProgramArguments{args};
 				}
 
 				i += 2;
@@ -353,7 +350,7 @@ ProgramArguments Tokenize(const std::string& line)
 
 			if (i >= lineLength)
 			{
-				return ProgramArguments{ args };
+				return ProgramArguments{args};
 			}
 
 			continue;
@@ -372,7 +369,7 @@ ProgramArguments Tokenize(const std::string& line)
 			{
 				if (line[i] == '#')
 				{
-					return ProgramArguments{ args };
+					return ProgramArguments{args};
 				}
 			}
 
@@ -380,12 +377,12 @@ ProgramArguments Tokenize(const std::string& line)
 			{
 				if ((line[i] == '/' && line[i + 1] == '/'))
 				{
-					return ProgramArguments{ args };
+					return ProgramArguments{args};
 				}
 
 				if (line[i] == '/' && line[i + 1] == '*')
 				{
-					return ProgramArguments{ args };
+					return ProgramArguments{args};
 				}
 			}
 
@@ -404,7 +401,7 @@ ProgramArguments Tokenize(const std::string& line)
 
 		if (i >= lineLength)
 		{
-			return ProgramArguments{ args };
+			return ProgramArguments{args};
 		}
 	}
 }

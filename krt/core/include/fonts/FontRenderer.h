@@ -4,8 +4,6 @@
 #undef DrawText
 #endif
 
-#include <fonts/Rect.h>
-#include <fonts/RGBA.h>
 #include <fonts/FontRendererAbstract.h>
 
 namespace krt

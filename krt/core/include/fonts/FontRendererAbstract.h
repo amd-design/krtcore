@@ -1,7 +1,9 @@
 #pragma once
 
-#include "RGBA.h"
 #include "FontRendererAllocator.h"
+
+#include <fonts/Rect.h>
+#include <fonts/RGBA.h>
 
 namespace krt
 {
@@ -27,11 +29,10 @@ struct FontRendererVertex : public FrpUseSequentialAllocator
 
 	FontRendererVertex()
 	{
-
 	}
 
 	FontRendererVertex(float x, float y, float u, float v, RGBA color)
-		: x(x), y(y), u(u), v(v), color(color)
+	    : x(x), y(y), u(u), v(v), color(color)
 	{
 	}
 };
@@ -61,6 +62,6 @@ public:
 
 	virtual void UnsetTexture() = 0;
 
-	virtual void InvokeOnRender(void(*cb)(void*), void* arg) = 0;
+	virtual void InvokeOnRender(void (*cb)(void*), void* arg) = 0;
 };
 }

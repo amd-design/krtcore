@@ -13,7 +13,7 @@ void PrintWarning(const char* format, ...);
 void PrintError(const char* format, ...);
 
 // NOT thread-safe!
-void AddPrintListener(void(*function)(const char*));
+void AddPrintListener(void (*function)(const char*));
 }
 
 namespace sys

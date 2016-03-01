@@ -54,7 +54,7 @@ struct ModelManager : public streaming::StreamingTypeInterface
 			return this->minimumDistance;
 		}
 
-	  private:
+	private:
 		friend struct ModelManager;
 
 		static void NativeReleaseModel(rw::Object* rwobj);
@@ -78,7 +78,7 @@ struct ModelManager : public streaming::StreamingTypeInterface
 		int flags;
 
 		ModelResource* non_lod_model; // non-SA: model of a higher-quality model than this one
-		ModelResource* lod_model; // model of a lower quality model than this one.
+		ModelResource* lod_model;     // model of a lower quality model than this one.
 
 		eModelType modelType;
 
@@ -107,7 +107,7 @@ struct ModelManager : public streaming::StreamingTypeInterface
 
 	size_t GetObjectMemorySize(streaming::ident_t localID) const override;
 
-  private:
+private:
 	streaming::StreamMan& streaming;
 	TextureManager& texManager;
 

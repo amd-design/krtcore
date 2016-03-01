@@ -28,7 +28,7 @@ class Game;
 // a game universe represents a single game's asset configuration
 class GameUniverse
 {
-  public:
+public:
 	GameUniverse(const GameConfiguration& configuration);
 
 	~GameUniverse();
@@ -70,14 +70,14 @@ class GameUniverse
 		return it->second;
 	}
 
-  private:
+private:
 	void AddImage(const std::string& relativePath);
 
 	ConsoleCommand cmdAddImage;
 
 	void LoadConfiguration(const std::string& relativePath);
 
-  private:
+private:
 	struct ImageFile
 	{
 		vfs::DevicePtr cdimage;
@@ -87,7 +87,7 @@ class GameUniverse
 		std::string primaryMount;
 	};
 
-  private:
+private:
 	GameConfiguration m_configuration;
 
 	std::vector<ImageFile> m_imageFiles;

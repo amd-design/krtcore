@@ -11,7 +11,7 @@ namespace krt
 {
 class NullEvent : public Event
 {
-  public:
+public:
 	void Handle() override
 	{
 		// do nothing, this event isn't meant to be handled
@@ -25,7 +25,7 @@ private:
 
 public:
 	ConsoleInputEvent(const std::string& input)
-		: m_text(input)
+	    : m_text(input)
 	{
 		SetTime(sys::Milliseconds());
 	}

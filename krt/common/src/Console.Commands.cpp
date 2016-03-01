@@ -1,6 +1,6 @@
 #include <StdInc.h>
-#include <Console.h>
 #include <Console.Commands.h>
+#include <Console.h>
 
 #include <utils/IteratorView.h>
 #include <utils/LockUtil.h>
@@ -8,7 +8,7 @@
 namespace krt
 {
 ConsoleCommandManager::ConsoleCommandManager(console::Context* parentContext)
-	: m_parentContext(parentContext), m_curToken(0)
+    : m_parentContext(parentContext), m_curToken(0)
 {
 }
 
@@ -21,7 +21,7 @@ int ConsoleCommandManager::Register(const std::string& name, const THandler& han
 	auto lock = exclusive_lock_acquire<std::shared_timed_mutex>(m_mutex);
 
 	int token = m_curToken.fetch_add(1);
-	m_entries.insert({ name, Entry{name, handler, token} });
+	m_entries.insert({name, Entry{name, handler, token}});
 
 	return token;
 }
@@ -45,7 +45,7 @@ void ConsoleCommandManager::Unregister(int token)
 void ConsoleCommandManager::Invoke(const std::string& commandString)
 {
 	ProgramArguments arguments = console::Tokenize(commandString);
-	std::string command = arguments.Shift();
+	std::string command        = arguments.Shift();
 
 	return Invoke(command, arguments);
 }

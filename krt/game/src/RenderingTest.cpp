@@ -86,7 +86,7 @@ void RenderingTest(void* gfxDevice)
 			angle -= 360.0f;
 		}
 
-		modelPtr->getFrame()->matrix = rw::Matrix::makeRotation(rw::Quat::rotation(angle * (3.14159265 / 180), rw::V3d(0.0f, 0.0f, 1.0f)));
+		modelPtr->getFrame()->matrix = rw::Matrix::makeRotation(rw::Quat::rotation(angle * (3.14159265f / 180), rw::V3d(0.0f, 0.0f, 1.0f)));
 		modelPtr->getFrame()->updateObjects();
 
 		static rw::Camera* camera = rw::Camera::create();

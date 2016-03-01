@@ -21,7 +21,7 @@ public:
 
 	virtual void DrawIndexedVertices(int numVertices, int numIndices, FontRendererVertex* vertex, uint16_t* indices) override;
 
-	virtual void InvokeOnRender(void(*cb)(void*), void* arg) override;
+	virtual void InvokeOnRender(void (*cb)(void*), void* arg) override;
 
 	virtual void DrawRectangles(int numRectangles, const ResultingRectangle* rectangles) override;
 
@@ -33,9 +33,8 @@ class KrtFontTexture : public FontRendererTexture
 {
 public:
 	KrtFontTexture(rw::Texture* texture)
-		: m_texture(texture)
+	    : m_texture(texture)
 	{
-		
 	}
 
 	~KrtFontTexture()
@@ -50,14 +49,13 @@ private:
 };
 
 KrtGameInterface::KrtGameInterface(GameWindow* gameWindow)
-	: m_gameWindow(gameWindow)
+    : m_gameWindow(gameWindow)
 {
-
 }
 
 FontRendererTexture* KrtGameInterface::CreateTexture(int width, int height, FontRendererTextureFormat format, void* pixelData)
 {
-	rw::Raster* raster = rw::Raster::create(width, height, 32, 0x80, rw::PLATFORM_D3D9);
+	rw::Raster* raster      = rw::Raster::create(width, height, 32, 0x80, rw::PLATFORM_D3D9);
 	rw::d3d::D3dRaster* ras = PLUGINOFFSET(rw::d3d::D3dRaster, raster, rw::d3d::nativeRasterOffset);
 	rw::d3d::allocateDXT(raster, 5, 1, true);
 	ras->customFormat = true;
@@ -98,9 +96,9 @@ void KrtGameInterface::SetTexture(FontRendererTexture* texture)
 	rw::Matrix projMatrix;
 	projMatrix.setIdentity();
 	projMatrix.right = rw::V3d(2.0f / width, 0.0f, 0.0f);
-	projMatrix.up = rw::V3d(0.0f, -2.0f / height, 0.0f);
-	projMatrix.at = rw::V3d(0.0f, 0.0f, 1.0f);
-	projMatrix.pos = rw::V3d(-1.0f, 1.0f, 0.0f);
+	projMatrix.up    = rw::V3d(0.0f, -2.0f / height, 0.0f);
+	projMatrix.at    = rw::V3d(0.0f, 0.0f, 1.0f);
+	projMatrix.pos   = rw::V3d(-1.0f, 1.0f, 0.0f);
 
 	rw::d3d::device->SetTransform(D3DTS_VIEW, (D3DMATRIX*)&viewMatrix);
 	rw::d3d::device->SetTransform(D3DTS_WORLD, (D3DMATRIX*)&viewMatrix);
@@ -121,20 +119,19 @@ void KrtGameInterface::DrawIndexedVertices(int numVertices, int numIndices, Font
 	if (!vertexDecl)
 	{
 		D3DVERTEXELEMENT9 vertexElements[] =
-		{
-			{ 0, 0, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
-			{ 0, 8, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
-			{ 0, 16, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0 },
-			D3DDECL_END()
-		};
+		    {
+		        {0, 0, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+		        {0, 8, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+		        {0, 16, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
+		        D3DDECL_END()};
 
 		check(SUCCEEDED(rw::d3d::device->CreateVertexDeclaration(vertexElements, &vertexDecl)));
 	}
 
 	for (int i = 0; i < numVertices; i++)
 	{
-		uint8_t oldRed = vertex[i].color.red;
-		vertex[i].color.red = vertex[i].color.blue;
+		uint8_t oldRed       = vertex[i].color.red;
+		vertex[i].color.red  = vertex[i].color.blue;
 		vertex[i].color.blue = oldRed;
 	}
 
@@ -153,12 +150,11 @@ void KrtGameInterface::DrawRectangles(int numRectangles, const ResultingRectangl
 	if (!vertexDecl)
 	{
 		D3DVERTEXELEMENT9 vertexElements[] =
-		{
-			{ 0, 0, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
-			{ 0, 8, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
-			{ 0, 16, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0 },
-			D3DDECL_END()
-		};
+		    {
+		        {0, 0, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+		        {0, 8, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+		        {0, 16, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
+		        D3DDECL_END()};
 
 		check(SUCCEEDED(rw::d3d::device->CreateVertexDeclaration(vertexElements, &vertexDecl)));
 	}
@@ -166,21 +162,20 @@ void KrtGameInterface::DrawRectangles(int numRectangles, const ResultingRectangl
 	for (size_t i : irange<size_t>(numRectangles))
 	{
 		auto rectangle = &rectangles[i];
-		auto& rect = rectangle->rectangle;
+		auto& rect     = rectangle->rectangle;
 
 		auto color = rectangle->color;
 
 		// swap RGB/BGR
 		uint8_t oldRed = color.red;
-		color.red = color.blue;
-		color.blue = oldRed;
+		color.red      = color.blue;
+		color.blue     = oldRed;
 
 		FontRendererVertex vertices[4] = {
-			{ rect.fX1, rect.fY1, 0.0f, 0.0f, color },
-			{ rect.fX2, rect.fY1, 0.0f, 0.0f, color },
-			{ rect.fX1, rect.fY2, 0.0f, 0.0f, color },
-			{ rect.fX2, rect.fY2, 0.0f, 0.0f, color }
-		};
+		    {rect.fX1, rect.fY1, 0.0f, 0.0f, color},
+		    {rect.fX2, rect.fY1, 0.0f, 0.0f, color},
+		    {rect.fX1, rect.fY2, 0.0f, 0.0f, color},
+		    {rect.fX2, rect.fY2, 0.0f, 0.0f, color}};
 
 		rw::d3d::device->SetVertexDeclaration(vertexDecl);
 		rw::d3d::device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, vertices, sizeof(vertices[0]));
@@ -189,7 +184,7 @@ void KrtGameInterface::DrawRectangles(int numRectangles, const ResultingRectangl
 	UnsetTexture();
 }
 
-void KrtGameInterface::InvokeOnRender(void(*cb)(void*), void* arg)
+void KrtGameInterface::InvokeOnRender(void (*cb)(void*), void* arg)
 {
 	// we're not a threaded renderer
 	cb(arg);

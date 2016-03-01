@@ -10,51 +10,49 @@ namespace krt
 
 struct World
 {
-    friend struct Entity;
+	friend struct Entity;
 
-    World( void );
-    ~World( void );
+	World(void);
+	~World(void);
 
-    void DepopulateEntities( void );
-    void PutEntitiesOnGrid( void );
+	void DepopulateEntities(void);
+	void PutEntitiesOnGrid(void);
 
-    void RenderWorld( void *gpuDevice );
+	void RenderWorld(void* gpuDevice);
 
 private:
-    NestedList <Entity> entityList;
+	NestedList<Entity> entityList;
 
-    // World sectors for optimized entity rendering.
-    struct StaticEntitySector
-    {
-        inline StaticEntitySector( void )
-        {
+	// World sectors for optimized entity rendering.
+	struct StaticEntitySector
+	{
+		inline StaticEntitySector(void)
+		{
+		}
 
-        }
+		void Clear(void)
+		{
+			return;
+		}
 
-        void Clear( void )
-        {
-            return;
-        }
+		void AddEntity(Entity* theEntity)
+		{
+			this->entitiesOnSector.push_back(theEntity);
+		}
 
-        void AddEntity( Entity *theEntity )
-        {
-            this->entitiesOnSector.push_back( theEntity );
-        }
+		void RemoveEntity(Entity* theEntity)
+		{
+			auto findIter = std::find(entitiesOnSector.begin(), entitiesOnSector.end(), theEntity);
 
-        void RemoveEntity( Entity *theEntity )
-        {
-            auto findIter = std::find( entitiesOnSector.begin(), entitiesOnSector.end(), theEntity );
+			if (findIter != entitiesOnSector.end())
+			{
+				entitiesOnSector.erase(findIter);
+			}
+		}
 
-            if ( findIter != entitiesOnSector.end() )
-            {
-                entitiesOnSector.erase( findIter );
-            }
-        }
+		std::list<Entity*> entitiesOnSector;
+	};
 
-        std::list <Entity*> entitiesOnSector;
-    };
-
-    SectorGrid <StaticEntitySector, 3000, 3> staticEntityGrid;
+	SectorGrid<StaticEntitySector, 3000, 3> staticEntityGrid;
 };
-
 };

@@ -51,8 +51,8 @@ Game::Game(const std::vector<std::pair<std::string, std::string>>& setList) : st
 
 	gta::attachPlugins();
 
-    // Keep track of the active camera, because only one camera can be active at a time in our engine.
-    this->activeCam = NULL;
+	// Keep track of the active camera, because only one camera can be active at a time in our engine.
+	this->activeCam = NULL;
 
 	// Prepare main world camera. (NOT FINAL).
 	worldCam.Initialize();
@@ -82,7 +82,7 @@ Game::Game(const std::vector<std::pair<std::string, std::string>>& setList) : st
 
 Game::~Game(void)
 {
-    assert( this->activeCam == NULL );
+	assert(this->activeCam == NULL);
 
 	// Delete important RW resources owned by the game.
 	worldCam.Shutdown();

@@ -19,7 +19,7 @@ namespace krt
 {
 namespace console
 {
-	class Context;
+class Context;
 }
 
 // console execution context
@@ -36,10 +36,10 @@ struct ConsoleExecutionContext
 
 class ConsoleCommandManager
 {
-  private:
+private:
 	using THandler = std::function<bool(ConsoleExecutionContext& context)>;
 
-  public:
+public:
 	ConsoleCommandManager(console::Context* context);
 
 	~ConsoleCommandManager();
@@ -54,7 +54,7 @@ class ConsoleCommandManager
 
 	void ForAllCommands(const std::function<void(const std::string&)>& callback);
 
-  private:
+private:
 	struct Entry
 	{
 		std::string name;
@@ -68,7 +68,7 @@ class ConsoleCommandManager
 		}
 	};
 
-  private:
+private:
 	console::Context* m_parentContext;
 
 	std::multimap<std::string, Entry, IgnoreCaseLess> m_entries;
@@ -77,16 +77,16 @@ class ConsoleCommandManager
 
 	std::atomic<int> m_curToken;
 
-  public:
+public:
 	static ConsoleCommandManager* GetDefaultInstance();
 };
 
 template <typename TArgument, typename TConstraint = void>
 struct ConsoleArgumentTraits
 {
-	using Less = std::less<TArgument>;
+	using Less    = std::less<TArgument>;
 	using Greater = std::greater<TArgument>;
-	using Equal = std::equal_to<TArgument>;
+	using Equal   = std::equal_to<TArgument>;
 };
 
 template <typename TArgument, typename TConstraint = void>
@@ -137,55 +137,55 @@ struct ConsoleArgumentName<std::string>
 };
 
 template <typename TArgument>
-struct ConsoleArgumentType <TArgument, typename std::enable_if <std::is_same <TArgument, bool>::value>::type>
+struct ConsoleArgumentType<TArgument, typename std::enable_if<std::is_same<TArgument, bool>::value>::type>
 {
-    static std::string Unparse( const TArgument& input )
-    {
-        if ( input == true )
-        {
-            return "true";
-        }
-        else
-        {
-            return "false";
-        }
-    }
+	static std::string Unparse(const TArgument& input)
+	{
+		if (input == true)
+		{
+			return "true";
+		}
+		else
+		{
+			return "false";
+		}
+	}
 
-    static bool Parse( const std::string& input, TArgument *out )
-    {
-        const char *inputPtr = input.c_str();
+	static bool Parse(const std::string& input, TArgument* out)
+	{
+		const char* inputPtr = input.c_str();
 
-        bool retBool = false;
+		bool retBool = false;
 
-        if ( _stricmp( inputPtr, "TRUE" ) == 0 )
-        {
-            retBool = true;
-        }
-        else if ( _stricmp( inputPtr, "FALSE" ) == 0 )
-        {
-            retBool = false;
-        }
-        else
-        {
-            // If the boolean declaration is not a recognized string, then just check whether its integral.
-            try
-            {
-                retBool = ( std::stoull( input ) != 0 );
-            }
-            catch( ... )
-            {
-                // Just do nothing.
-                // Assume that the best default is already written to retBool.
-            }
-        }
+		if (_stricmp(inputPtr, "TRUE") == 0)
+		{
+			retBool = true;
+		}
+		else if (_stricmp(inputPtr, "FALSE") == 0)
+		{
+			retBool = false;
+		}
+		else
+		{
+			// If the boolean declaration is not a recognized string, then just check whether its integral.
+			try
+			{
+				retBool = (std::stoull(input) != 0);
+			}
+			catch (...)
+			{
+				// Just do nothing.
+				// Assume that the best default is already written to retBool.
+			}
+		}
 
-        *out = retBool;
-        return true;
-    }
+		*out = retBool;
+		return true;
+	}
 };
 
 template <typename TArgument>
-struct ConsoleArgumentType<TArgument, std::enable_if_t<std::is_integral<TArgument>::value && !std::is_same<TArgument,bool>::value>>
+struct ConsoleArgumentType<TArgument, std::enable_if_t<std::is_integral<TArgument>::value && !std::is_same<TArgument, bool>::value>>
 {
 	static std::string Unparse(const TArgument& input)
 	{

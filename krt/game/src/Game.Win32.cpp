@@ -6,8 +6,8 @@
 
 #include <windows.h>
 
-#include <shlwapi.h>
 #include <shlobj.h>
+#include <shlwapi.h>
 
 #pragma comment(lib, "shlwapi.lib")
 
@@ -50,8 +50,8 @@ void Game::MountUserDirectory()
 
 void Game::YieldThreadForShortTime()
 {
-    // I do not want this thing to max out my CPU :/
-    // And we are not doing realistic simulations yet.
-    Sleep( 1 );
+	// I do not want this thing to max out my CPU :/
+	// And we are not doing realistic simulations yet.
+	Sleep(1);
 }
 }

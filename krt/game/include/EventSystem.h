@@ -6,15 +6,15 @@ namespace krt
 {
 class Event abstract
 {
-  public:
+public:
 	inline uint64_t GetTime() const { return m_time; }
 
 	inline void SetTime(uint64_t time) { m_time = time; }
 
-  public:
+public:
 	virtual void Handle() = 0;
 
-  private:
+private:
 	uint64_t m_time;
 };
 
@@ -213,7 +213,7 @@ enum class KeyCode
 
 class KeyEvent : public Event
 {
-  public:
+public:
 	inline KeyEvent(bool isDown, KeyCode keyCode)
 	    : m_isDown(isDown), m_keyCode(keyCode)
 	{
@@ -231,7 +231,7 @@ class KeyEvent : public Event
 		return m_keyCode;
 	}
 
-  private:
+private:
 	bool m_isDown;
 
 	KeyCode m_keyCode;
@@ -240,7 +240,7 @@ class KeyEvent : public Event
 // actually [arbitrary UTF8 sequence] event, thanks input methods!
 class CharEvent : public Event
 {
-  public:
+public:
 	inline CharEvent(const std::string& ch)
 	    : m_character(ch)
 	{
@@ -250,13 +250,13 @@ class CharEvent : public Event
 
 	inline const std::string& GetCharacter() const { return m_character; }
 
-  private:
+private:
 	std::string m_character;
 };
 
 class MouseEvent : public Event
 {
-  public:
+public:
 	inline MouseEvent(int dX, int dY)
 	    : m_dX(dX), m_dY(dY)
 	{
@@ -274,7 +274,7 @@ class MouseEvent : public Event
 		return m_dY;
 	}
 
-  private:
+private:
 	int m_dX;
 	int m_dY;
 };
@@ -288,9 +288,8 @@ struct EventListener
 		EventListener* catcher;
 
 		State()
-			: catcher(nullptr)
+		    : catcher(nullptr)
 		{
-
 		}
 	};
 
@@ -321,11 +320,11 @@ struct EventListener
 		GetState()->catcher = nullptr;
 	}
 
-  private:
+private:
 	std::function<void(const T*)> m_handler;
 
 	// static members
-  public:
+public:
 	static void Handle(const T* event)
 	{
 		for (auto& listener : GetState()->listeners)
@@ -340,7 +339,7 @@ struct EventListener
 		}
 	}
 
-  private:
+private:
 	// this is not a dynamic initializer due to initializer order
 	static State* GetState()
 	{
@@ -350,22 +349,21 @@ struct EventListener
 	}
 };
 
-#define DECLARE_EVENT_LISTENER(t) \
-	
+#define DECLARE_EVENT_LISTENER(t)
 
 class EventSystem
 {
-  public:
+public:
 	uint64_t HandleEvents();
 
 	void QueueEvent(std::unique_ptr<Event>&& ev);
 
 	void RegisterEventSourceFunction(const std::function<void()>& function);
 
-  private:
+private:
 	std::unique_ptr<Event> GetEvent();
 
-  private:
+private:
 	std::vector<std::function<void()>> m_eventSources;
 
 	std::queue<std::unique_ptr<Event>> m_events;

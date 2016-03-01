@@ -1,12 +1,11 @@
 #include <StdInc.h>
 
-#include <vfs/Manager.h>
 #include <Console.CommandHelpers.h>
+#include <vfs/Manager.h>
 
 namespace krt
 {
-static ConsoleCommand execCommand("exec", [] (const std::string& path)
-{
+static ConsoleCommand execCommand("exec", [](const std::string& path) {
 	vfs::StreamPtr stream = vfs::OpenRead(path);
 
 	if (!stream)

@@ -16,12 +16,11 @@ namespace krt
 GameUniverse::GameUniverse(const GameConfiguration& configuration)
     : m_configuration(configuration), m_game(theGame),
 
-    // Initialize all game universe commands.
-    cmdAddImage("add_cdimage",
-        [](const GameUniversePtr& universe, const std::string& path)
-    {
-        universe->AddImage( path );
-    })
+      // Initialize all game universe commands.
+      cmdAddImage("add_cdimage",
+          [](const GameUniversePtr& universe, const std::string& path) {
+	          universe->AddImage(path);
+	      })
 {
 }
 
@@ -74,19 +73,19 @@ void GameUniverse::LoadConfiguration(const std::string& relativePath)
 
 	// add commands to the context
 	ConsoleCommand ideLoadCmd(&localConsole, "IDE",
-	                          [&](const std::string& fileName) {
-		                          localConsole.ExecuteSingleCommand(ProgramArguments{"load_ide", m_configuration.gameName, GetMountPoint() + fileName});
-		                      });
+	    [&](const std::string& fileName) {
+		    localConsole.ExecuteSingleCommand(ProgramArguments{"load_ide", m_configuration.gameName, GetMountPoint() + fileName});
+		});
 
 	ConsoleCommand iplLoadCmd(&localConsole, "IPL",
-	                          [&](const std::string& fileName) {
-		                          localConsole.ExecuteSingleCommand(ProgramArguments{"load_ipl", m_configuration.gameName, GetMountPoint() + fileName});
-		                      });
+	    [&](const std::string& fileName) {
+		    localConsole.ExecuteSingleCommand(ProgramArguments{"load_ipl", m_configuration.gameName, GetMountPoint() + fileName});
+		});
 
 	ConsoleCommand imgMountCmd(&localConsole, "IMG",
-	                           [&](const std::string& path) {
-		                           localConsole.ExecuteSingleCommand(ProgramArguments{"add_cdimage", m_configuration.gameName, path});
-		                       });
+	    [&](const std::string& path) {
+		    localConsole.ExecuteSingleCommand(ProgramArguments{"add_cdimage", m_configuration.gameName, path});
+		});
 
 	// run the configuration file
 	localConsole.AddToBuffer(std::string(reinterpret_cast<char*>(string.data()), string.size()));

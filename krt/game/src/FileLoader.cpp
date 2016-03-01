@@ -710,7 +710,7 @@ struct inst_section_manager
 		this->instances.clear();
 	}
 
-  private:
+private:
 	struct lod_inst_entity
 	{
 		int lod_id;

@@ -16,12 +16,12 @@ Device::THandle Win32Device::Open(const std::string& fileName, bool readOnly)
 	std::wstring wideName = ToWide(fileName);
 
 	HANDLE hFile = CreateFileW(wideName.c_str(),
-	                           (readOnly) ? GENERIC_READ : (GENERIC_READ | GENERIC_WRITE),
-	                           FILE_SHARE_READ | FILE_SHARE_WRITE,
-	                           nullptr,
-	                           OPEN_EXISTING,
-	                           FILE_ATTRIBUTE_NORMAL,
-	                           nullptr);
+	    (readOnly) ? GENERIC_READ : (GENERIC_READ | GENERIC_WRITE),
+	    FILE_SHARE_READ | FILE_SHARE_WRITE,
+	    nullptr,
+	    OPEN_EXISTING,
+	    FILE_ATTRIBUTE_NORMAL,
+	    nullptr);
 
 	return reinterpret_cast<THandle>(hFile);
 }
@@ -32,12 +32,12 @@ Device::THandle Win32Device::OpenBulk(const std::string& fileName, uint64_t* ptr
 	*ptr                  = 0;
 
 	HANDLE hFile = CreateFileW(wideName.c_str(),
-	                           GENERIC_READ,
-	                           FILE_SHARE_READ,
-	                           nullptr,
-	                           OPEN_EXISTING,
-	                           FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
-	                           nullptr);
+	    GENERIC_READ,
+	    FILE_SHARE_READ,
+	    nullptr,
+	    OPEN_EXISTING,
+	    FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
+	    nullptr);
 
 	return reinterpret_cast<THandle>(hFile);
 }
@@ -47,12 +47,12 @@ Device::THandle Win32Device::Create(const std::string& filename)
 	std::wstring wideName = ToWide(filename);
 
 	HANDLE hFile = CreateFileW(wideName.c_str(),
-	                           GENERIC_READ | GENERIC_WRITE,
-	                           FILE_SHARE_READ,
-	                           nullptr,
-	                           CREATE_ALWAYS,
-	                           FILE_ATTRIBUTE_NORMAL,
-	                           nullptr);
+	    GENERIC_READ | GENERIC_WRITE,
+	    FILE_SHARE_READ,
+	    nullptr,
+	    CREATE_ALWAYS,
+	    FILE_ATTRIBUTE_NORMAL,
+	    nullptr);
 
 	return reinterpret_cast<THandle>(hFile);
 }

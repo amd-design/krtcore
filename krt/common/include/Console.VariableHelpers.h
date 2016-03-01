@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Console.h>
 #include <Console.Variables.h>
+#include <Console.h>
 
 namespace krt
 {
@@ -16,40 +16,35 @@ private:
 
 public:
 	ConVar(const std::string& name, int flags, const TVariable& defaultValue)
-		: ConVar(ConsoleVariableManager::GetDefaultInstance(), name, flags, defaultValue, nullptr)
+	    : ConVar(ConsoleVariableManager::GetDefaultInstance(), name, flags, defaultValue, nullptr)
 	{
-
 	}
 
 	ConVar(console::Context* context, const std::string& name, int flags, const TVariable& defaultValue)
-		: ConVar(context->GetVariableManager(), name, flags, defaultValue, nullptr)
+	    : ConVar(context->GetVariableManager(), name, flags, defaultValue, nullptr)
 	{
-
 	}
 
 	ConVar(ConsoleVariableManager* manager, const std::string& name, int flags, const TVariable& defaultValue)
-		: ConVar(manager, name, flags, defaultValue, nullptr)
+	    : ConVar(manager, name, flags, defaultValue, nullptr)
 	{
-
 	}
 
 	ConVar(const std::string& name, int flags, const TVariable& defaultValue, TVariable* trackingVar)
-		: ConVar(ConsoleVariableManager::GetDefaultInstance(), name, flags, defaultValue, trackingVar)
+	    : ConVar(ConsoleVariableManager::GetDefaultInstance(), name, flags, defaultValue, trackingVar)
 	{
-
 	}
 
 	ConVar(console::Context* context, const std::string& name, int flags, const TVariable& defaultValue, TVariable* trackingVar)
-		: ConVar(context->GetVariableManager(), name, flags, defaultValue, trackingVar)
+	    : ConVar(context->GetVariableManager(), name, flags, defaultValue, trackingVar)
 	{
-
 	}
 
 	ConVar(ConsoleVariableManager* manager, const std::string& name, int flags, const TVariable& defaultValue, TVariable* trackingVar)
-		: m_manager(manager)
+	    : m_manager(manager)
 	{
 		m_helper = CreateVariableEntry<TVariable>(manager, name, defaultValue);
-		m_token = m_manager->Register(name, flags, m_helper);
+		m_token  = m_manager->Register(name, flags, m_helper);
 
 		if (trackingVar)
 		{

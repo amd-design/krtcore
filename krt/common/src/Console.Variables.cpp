@@ -1,14 +1,13 @@
 #include <StdInc.h>
-#include <Console.h>
 #include <Console.Variables.h>
+#include <Console.h>
 
 namespace krt
 {
 ConsoleVariableManager::ConsoleVariableManager(console::Context* parentContext)
-	: m_parentContext(parentContext), m_curToken(0)
+    : m_parentContext(parentContext), m_curToken(0)
 {
-	auto setCommand = [=] (bool archive, const std::string& variable, const std::string& value)
-	{
+	auto setCommand = [=](bool archive, const std::string& variable, const std::string& value) {
 		// weird order is to prevent recursive locking
 		{
 			Entry* entry = nullptr;
@@ -50,14 +49,12 @@ ConsoleVariableManager::ConsoleVariableManager(console::Context* parentContext)
 		Register(variable, flags, entry);
 	};
 
-	m_setCommand = std::make_unique<ConsoleCommand>(m_parentContext, "set", [=] (const std::string& variable, const std::string& value)
-	{
+	m_setCommand = std::make_unique<ConsoleCommand>(m_parentContext, "set", [=](const std::string& variable, const std::string& value) {
 		setCommand(false, variable, value);
 	});
 
 	// set archived
-	m_setaCommand = std::make_unique<ConsoleCommand>(m_parentContext, "seta", [=] (const std::string& variable, const std::string& value)
-	{
+	m_setaCommand = std::make_unique<ConsoleCommand>(m_parentContext, "seta", [=](const std::string& variable, const std::string& value) {
 		setCommand(true, variable, value);
 	});
 }
@@ -85,7 +82,7 @@ int ConsoleVariableManager::Register(const std::string& name, int flags, const T
 	int token = m_curToken.fetch_add(1);
 	m_entries.erase(name); // remove any existing entry
 
-	m_entries.insert({ name, Entry{name, flags, variable, token} });
+	m_entries.insert({name, Entry{name, flags, variable, token}});
 
 	return token;
 }
@@ -159,10 +156,10 @@ void ConsoleVariableManager::ForAllVariables(const TVariableCB& callback, int fl
 
 void ConsoleVariableManager::SaveConfiguration(const TWriteLineCB& writeLineFunction)
 {
-	ForAllVariables([&] (const std::string& name, int flags, const THandlerPtr& variable)
-	{
+	ForAllVariables([&](const std::string& name, int flags, const THandlerPtr& variable) {
 		writeLineFunction("seta \"" + name + "\" \"" + variable->GetValue() + "\"");
-	}, ConVar_Archive);
+	},
+	    ConVar_Archive);
 }
 
 bool ConsoleVariableManager::Process(const std::string& commandName, const ProgramArguments& arguments)
