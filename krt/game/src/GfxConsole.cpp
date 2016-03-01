@@ -3,9 +3,9 @@
 
 #include <EventSystem.h>
 
-#include <Console.h>
 #include <Console.Commands.h>
 #include <Console.Variables.h>
+#include <Console.h>
 
 #include <sstream>
 
@@ -13,14 +13,14 @@ namespace krt
 {
 class GfxConsole
 {
-public:
+  public:
 	GfxConsole();
 
 	void Render();
 
 	void Print(const std::string& string);
 
-private:
+  private:
 	void HandleKey(const KeyEvent* ev);
 
 	void HandleChar(const CharEvent* ev);
@@ -31,7 +31,7 @@ private:
 
 	void ResetTop();
 
-private:
+  private:
 	std::vector<std::string> m_screenBuffer;
 	std::vector<std::string> m_commandHistory;
 
@@ -57,12 +57,12 @@ private:
 };
 
 GfxConsole::GfxConsole()
-	: m_screenWidth(1920), m_screenHeight(1080), m_active(false), m_keyListener(std::bind(&GfxConsole::HandleKey, this, std::placeholders::_1)), m_charListener(std::bind(&GfxConsole::HandleChar, this, std::placeholders::_1)), m_screenTop(0)
+    : m_screenWidth(1920), m_screenHeight(1080), m_active(false), m_keyListener(std::bind(&GfxConsole::HandleKey, this, std::placeholders::_1)), m_charListener(std::bind(&GfxConsole::HandleChar, this, std::placeholders::_1)), m_screenTop(0)
 {
 	// update width/height from console variables
 	ConsoleVariableManager* varMan = console::GetDefaultContext()->GetVariableManager();
-	m_screenWidth = atoi(varMan->FindEntryRaw("r_width")->GetValue().c_str());
-	m_screenHeight = atoi(varMan->FindEntryRaw("r_height")->GetValue().c_str());
+	m_screenWidth                  = atoi(varMan->FindEntryRaw("r_width")->GetValue().c_str());
+	m_screenHeight                 = atoi(varMan->FindEntryRaw("r_height")->GetValue().c_str());
 
 	// set size
 	m_screenBuffer.resize(1);
@@ -79,7 +79,7 @@ void GfxConsole::HandleKey(const KeyEvent* ev)
 	}
 
 	KeyCode key = ev->GetKeyCode();
-	
+
 	// is this the console key?
 	if (key == KeyCode::F11 || key == KeyCode::Oemtilde)
 	{
@@ -106,7 +106,7 @@ void GfxConsole::HandleKey(const KeyEvent* ev)
 	{
 		if (m_inputBuffer.length() > 0)
 		{
-			m_inputBuffer = m_inputBuffer.substr(0, m_inputBuffer.length() - 1);
+			m_inputBuffer      = m_inputBuffer.substr(0, m_inputBuffer.length() - 1);
 			m_typedInputBuffer = m_inputBuffer;
 
 			UpdateSuggestions();
@@ -218,8 +218,7 @@ void GfxConsole::UpdateSuggestions()
 	{
 		std::set<std::string, IgnoreCaseLess> suggestions;
 
-		console::GetDefaultContext()->GetCommandManager()->ForAllCommands([&] (const std::string& name)
-		{
+		console::GetDefaultContext()->GetCommandManager()->ForAllCommands([&](const std::string& name) {
 			if (strnicmp(name.c_str(), m_typedInputBuffer.c_str(), m_typedInputBuffer.length()) != 0)
 			{
 				return;
@@ -249,7 +248,7 @@ void GfxConsole::SendCommand()
 	console::AddToBuffer(m_inputBuffer);
 	console::AddToBuffer("\n");
 
-	m_inputBuffer = "";
+	m_inputBuffer      = "";
 	m_typedInputBuffer = "";
 
 	UpdateSuggestions();
@@ -261,7 +260,7 @@ void GfxConsole::Print(const std::string& string)
 
 	std::stringstream stream;
 	std::string* stringReference = &m_screenBuffer.back();
-		
+
 	for (int i = 0; i < string.length(); i++)
 	{
 		if (string[i] == '\n')
@@ -332,7 +331,7 @@ void GfxConsole::Render()
 
 		TheFonts->DrawText(text, rect, RGBA(255, 255, 0), 14.0f, 1.0f, "Consolas");
 
-		inputBoxRight = x + 7 + mRect.Right();
+		inputBoxRight  = x + 7 + mRect.Right();
 		inputBoxBottom = y + h + 2;
 	}
 
@@ -360,7 +359,7 @@ void GfxConsole::Render()
 		// TODO: reset flag?
 
 		m_screenSize = (h - 4) / size;
-		int i = 0;
+		int i        = 0;
 
 		y += 5;
 
@@ -406,8 +405,7 @@ void GfxConsole::Render()
 			}
 
 			// get the longest suggestion string
-			auto longestSuggestion = std::max_element(modifiedSuggestions.begin(), modifiedSuggestions.end(), [] (const std::string& left, const std::string& right)
-			{
+			auto longestSuggestion = std::max_element(modifiedSuggestions.begin(), modifiedSuggestions.end(), [](const std::string& left, const std::string& right) {
 				return left.length() < right.length();
 			});
 
@@ -419,9 +417,9 @@ void GfxConsole::Render()
 			int y = inputBoxBottom - 2;
 
 			int lines = std::min(m_suggestions.size(), (size_t)20);
-			int h = (lines * 16) + 4 + 6;
-			int w = mRect.Width() + 4 + 6;
-			
+			int h     = (lines * 16) + 4 + 6;
+			int w     = mRect.Width() + 4 + 6;
+
 			// draw background
 			Rect rect;
 			rect.SetRect(x, y, x + w, y + h);
@@ -458,10 +456,8 @@ GfxConsole* GetGfxConsole()
 	static GfxConsole gfxConsole;
 	static std::once_flag printListenerFlag;
 
-	std::call_once(printListenerFlag, [] ()
-	{
-		console::AddPrintListener([] (const char* string)
-		{
+	std::call_once(printListenerFlag, []() {
+		console::AddPrintListener([](const char* string) {
 			gfxConsole.Print(string);
 		});
 	});
