@@ -12,7 +12,7 @@ void* FrpUseSequentialAllocator::operator new[] (size_t size)
 {
 	char* arenaPtr = reinterpret_cast<char*>(g_seqArena) + (g_seqPage * (8 * 1024 * 1024));
 
-	LONG offset = InterlockedAdd(&g_seqStart, size) - size;
+	LONG offset = InterlockedAdd(&g_seqStart, static_cast<LONG>(size)) - static_cast<LONG>(size);
 	void* retPtr = &arenaPtr[offset];
 
 	return retPtr;

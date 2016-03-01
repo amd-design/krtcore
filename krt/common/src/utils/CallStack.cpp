@@ -2,6 +2,9 @@
 #include <utils/CallStack.h>
 
 #include <windows.h>
+
+// dbghelp.h causes this warning
+#pragma warning(disable: 4091)
 #include <dbghelp.h>
 
 #pragma comment(lib, "dbghelp.lib")

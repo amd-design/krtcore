@@ -145,8 +145,8 @@ void EditorCameraControls::OnFrame( Camera *camera )
 
     // Linear turn velocity, based on euler angles.
     {
-        double yaw_velo_val = this->yaw_velo.GetCurrent() * frame_delta;
-        double pitch_velo_val = this->pitch_velo.GetCurrent() * frame_delta;
+        float yaw_velo_val = this->yaw_velo.GetCurrent() * frame_delta;
+        float pitch_velo_val = this->pitch_velo.GetCurrent() * frame_delta;
 
         if ( yaw_velo_val != 0 || pitch_velo_val != 0 )
         {

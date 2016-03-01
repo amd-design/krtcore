@@ -301,7 +301,7 @@ static rw::Atomic* GetFirstClumpAtomic( rw::Clump *clump )
         [&]( rw::Atomic *atom )
     {
 		const char* nodeName = gta::getNodeName(atom->getFrame());
-		int nodeNameLength = strlen(nodeName);
+		size_t nodeNameLength = strlen(nodeName);
 
 		if (nodeNameLength > 3)
 		{

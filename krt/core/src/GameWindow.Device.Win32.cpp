@@ -3,7 +3,9 @@
 #include <windows.h>
 #include <d3d9.h>
 
+#ifndef RW_D3D9
 #define RW_D3D9
+#endif
 
 #include "src/rwd3d.h"
 #include "src/rwd3d9.h"

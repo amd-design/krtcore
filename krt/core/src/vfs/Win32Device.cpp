@@ -62,7 +62,7 @@ size_t Win32Device::Read(THandle handle, void* outBuffer, size_t size)
 	assert(handle != Device::InvalidHandle);
 
 	DWORD bytesRead;
-	BOOL result = ReadFile(reinterpret_cast<HANDLE>(handle), outBuffer, size, &bytesRead, nullptr);
+	BOOL result = ReadFile(reinterpret_cast<HANDLE>(handle), outBuffer, static_cast<DWORD>(size), &bytesRead, nullptr);
 
 	return (!result) ? -1 : bytesRead;
 }
@@ -75,7 +75,7 @@ size_t Win32Device::ReadBulk(THandle handle, uint64_t ptr, void* outBuffer, size
 	overlapped.Offset     = (ptr & 0xFFFFFFFF);
 	overlapped.OffsetHigh = ptr >> 32;
 
-	BOOL result    = ReadFile(reinterpret_cast<HANDLE>(handle), outBuffer, size, nullptr, &overlapped);
+	BOOL result    = ReadFile(reinterpret_cast<HANDLE>(handle), outBuffer, static_cast<DWORD>(size), nullptr, &overlapped);
 	bool ioPending = false;
 
 	if (!result)
@@ -114,7 +114,7 @@ size_t Win32Device::Write(THandle handle, const void* buffer, size_t size)
 	assert(handle != Device::InvalidHandle);
 
 	DWORD bytesWritten;
-	BOOL result = WriteFile(reinterpret_cast<HANDLE>(handle), buffer, size, &bytesWritten, nullptr);
+	BOOL result = WriteFile(reinterpret_cast<HANDLE>(handle), buffer, static_cast<DWORD>(size), &bytesWritten, nullptr);
 
 	return (result) ? bytesWritten : -1;
 }
@@ -142,15 +142,15 @@ size_t Win32Device::Seek(THandle handle, intptr_t offset, int seekType)
 	}
 	else if (seekType == SEEK_END)
 	{
-		moveMethod == FILE_END;
+		moveMethod = FILE_END;
 	}
 
-	return SetFilePointer(reinterpret_cast<HANDLE>(handle), offset, nullptr, moveMethod);
+	return SetFilePointer(reinterpret_cast<HANDLE>(handle), static_cast<LONG>(offset), nullptr, moveMethod);
 }
 
 bool Win32Device::Close(THandle handle)
 {
-	return CloseHandle(reinterpret_cast<HANDLE>(handle));
+	return CloseHandle(reinterpret_cast<HANDLE>(handle)) != FALSE;
 }
 
 bool Win32Device::CloseBulk(THandle handle)
@@ -161,7 +161,7 @@ bool Win32Device::CloseBulk(THandle handle)
 bool Win32Device::RemoveFile(const std::string& filename)
 {
 	std::wstring wideName = ToWide(filename);
-	return DeleteFile(wideName.c_str());
+	return DeleteFile(wideName.c_str()) != FALSE;
 }
 
 bool Win32Device::RenameFile(const std::string& from, const std::string& to)
@@ -169,21 +169,21 @@ bool Win32Device::RenameFile(const std::string& from, const std::string& to)
 	std::wstring fromName = ToWide(from);
 	std::wstring toName   = ToWide(to);
 
-	return MoveFile(fromName.c_str(), toName.c_str());
+	return MoveFile(fromName.c_str(), toName.c_str()) != FALSE;
 }
 
 bool Win32Device::CreateDirectory(const std::string& name)
 {
 	std::wstring wideName = ToWide(name);
 
-	return CreateDirectoryW(wideName.c_str(), nullptr);
+	return CreateDirectoryW(wideName.c_str(), nullptr) != FALSE;
 }
 
 bool Win32Device::RemoveDirectory(const std::string& name)
 {
 	std::wstring wideName = ToWide(name);
 
-	return RemoveDirectoryW(wideName.c_str());
+	return RemoveDirectoryW(wideName.c_str()) != FALSE;
 }
 
 size_t Win32Device::GetLength(THandle handle)
@@ -191,7 +191,7 @@ size_t Win32Device::GetLength(THandle handle)
 	DWORD highPortion;
 	DWORD lowPortion = GetFileSize(reinterpret_cast<HANDLE>(handle), &highPortion);
 
-	return lowPortion | (highPortion << 32);
+	return lowPortion | (static_cast<size_t>(highPortion) << 32);
 }
 
 Device::THandle Win32Device::FindFirst(const std::string& folder, FindData* findData)
@@ -225,7 +225,7 @@ bool Win32Device::FindNext(THandle handle, FindData* findData)
 		findData->name       = ToNarrow(winFindData.cFileName);
 	}
 
-	return result;
+	return result != FALSE;
 }
 
 void Win32Device::FindClose(THandle handle)

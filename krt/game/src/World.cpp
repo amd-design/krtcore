@@ -176,8 +176,8 @@ void World::RenderWorld( void *gfxDevice )
 		static EventListener<MouseEvent> eventListener([] (const MouseEvent* event)
 		{
 			// calculate angle movement
-			float mx = event->GetDeltaX();
-			float my = event->GetDeltaY();
+			float mx = static_cast<float>(event->GetDeltaX());
+			float my = static_cast<float>(event->GetDeltaY());
 
 			// historical values for filtering
 			static int mouseDx[2];

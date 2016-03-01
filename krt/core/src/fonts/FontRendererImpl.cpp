@@ -228,7 +228,7 @@ void FontRendererImpl::DrawText(const std::string& text, const Rect& rect, const
 			noColorTextString = noColorText.str();
 		}
 
-		m_dwFactory->CreateTextLayout(noColorTextString.c_str(), noColorTextString.length(), textFormat.Get(), rect.Width(), rect.Height(), textLayout.GetAddressOf());
+		m_dwFactory->CreateTextLayout(noColorTextString.c_str(), static_cast<UINT32>(noColorTextString.length()), textFormat.Get(), rect.Width(), rect.Height(), textLayout.GetAddressOf());
 
 		m_textLayoutCache[layoutKey] = textLayout;
 
@@ -283,7 +283,7 @@ bool FontRendererImpl::GetStringMetrics(const std::string& characterString, floa
 	std::wstring wide = ToWide(stripped);
 
 	ComPtr<IDWriteTextLayout> textLayout;
-	m_dwFactory->CreateTextLayout(wide.c_str(), wide.length(), textFormat.Get(), 8192.0, 8192.0, textLayout.GetAddressOf());
+	m_dwFactory->CreateTextLayout(wide.c_str(), static_cast<UINT32>(wide.length()), textFormat.Get(), 8192.0, 8192.0, textLayout.GetAddressOf());
 
 	DWRITE_TEXT_METRICS textMetrics;
 	textLayout->GetMetrics(&textMetrics);
