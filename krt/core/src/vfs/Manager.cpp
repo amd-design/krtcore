@@ -29,8 +29,20 @@ StreamPtr Manager::OpenRead(const std::string& path)
 	return nullptr;
 }
 
+DevicePtr MakeMemoryDevice();
+
 DevicePtr Manager::GetDevice(const std::string& path)
 {
+	// return hardcoded devices
+	{
+		if (_strnicmp(path.c_str(), "memory:", 7) == 0)
+		{
+			static vfs::DevicePtr memoryDevice = MakeMemoryDevice();
+
+			return memoryDevice;
+		}
+	}
+
 	std::lock_guard<std::recursive_mutex> lock(m_mountMutex);
 
 	// if only one device exists for a chosen prefix, we want to always return that device

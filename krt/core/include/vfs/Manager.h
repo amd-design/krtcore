@@ -62,5 +62,7 @@ DevicePtr GetDevice(const std::string& path);
 void Mount(const DevicePtr& device, const std::string& path);
 
 void Unmount(const std::string& path);
+
+std::string MakeMemoryFilename(const void* buffer, size_t size);
 }
 }
